@@ -5,6 +5,8 @@ import argparse
 import os
 import time
 from datetime import datetime
+import json
+import sys
 
 import tensorboard
 
@@ -19,7 +21,7 @@ def parse_args():
     """コマンドライン引数の解析"""
     parser = argparse.ArgumentParser(description='パンデミックシミュレーションでAIエージェントを比較')
     
-    parser.add_argument('--episodes', type=int, default=10,
+    parser.add_argument('--episodes', type=int, default=100,
                        help='実行するエピソード数 (デフォルト: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
                        help='ログと結果を保存するディレクトリ (デフォルト: ./logs)')
@@ -29,6 +31,9 @@ def parse_args():
                        help='比較するエージェント (デフォルト: すべて)')
     parser.add_argument('--seed', type=int, default=None,
                        help='乱数シードを固定 (再現性のため)')
+    parser.add_argument('--visualize', action='store_true',
+                       help='実験結果を可視化')
+    parser.add_argument("--visualize", action="store_true", help="実験後に結果を可視化する")
     
     return parser.parse_args()
 
@@ -57,9 +62,50 @@ def setup_experiment_dir(base_log_dir):
     os.makedirs(exp_dir, exist_ok=True)
     return exp_dir
 
+def check_config_files():
+    # パッケージのルートディレクトリを特定
+    config_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "pandemic", "config"
+    )
+    
+    print(f"Checking config files in: {config_dir}")
+    
+    config_files = [
+        "cities_config.json",
+        "diseases_config.json",
+        "roles_config.json",
+        "game_config.json"
+    ]
+    
+    all_exist = True
+    for filename in config_files:
+        filepath = os.path.join(config_dir, filename)
+        if os.path.exists(filepath):
+            print(f"✓ {filename} exists")
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                print(f"  JSON is valid, keys: {list(data.keys())}")
+            except json.JSONDecodeError:
+                print(f"✗ {filename} contains invalid JSON")
+                all_exist = False
+        else:
+            print(f"✗ {filename} does not exist")
+            all_exist = False
+    
+    return all_exist
+
 def main():
     """メイン実行関数"""
     args = parse_args()
+    
+    # 設定ディレクトリの絶対パス
+    config_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "pandemic", "config"
+    )
+    print(f"設定ディレクトリ: {config_dir}")
     
     # 乱数シードの設定（指定されていれば）
     if args.seed is not None:
@@ -87,14 +133,14 @@ def main():
     print(f"パンデミックシミュレーション実験を開始 ({args.episodes}エピソード)...")
     start_time = time.time()
     
+    # 設定ディレクトリを明示的に渡す
     runner = SimulationRunner(n_episodes=args.episodes, log_dir=log_dir)
-    runner.run_experiments(strategies)
+    results = runner.run_experiments(strategies, config_dir=config_dir)
     
     end_time = time.time()
     print(f"実験完了。所要時間: {end_time - start_time:.2f}秒")
     
     # 実験設定を保存
-    import json
     with open(os.path.join(log_dir, "experiment_config.json"), "w") as f:
         json.dump({
             "episodes": args.episodes,
@@ -102,6 +148,18 @@ def main():
             "seed": args.seed,
             "timestamp": datetime.now().isoformat()
         }, f, indent=2)
+    
+    # 実験終了後、可視化（必要であれば）
+    if args.visualize:
+        print("結果を可視化しています...")
+        from pandemic.visualization.performance_charts import create_performance_charts
+        create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
+        print(f"可視化結果を {log_dir}/plots に保存しました")
 
 if __name__ == "__main__":
-    main()
+    if check_config_files():
+        print("All config files exist and are valid.")
+        main()
+    else:
+        print("Some config files are missing or invalid.")
+        sys.exit(1)

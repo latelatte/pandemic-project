@@ -1,5 +1,7 @@
 import json
 import numpy as np
+import gzip
+import os
 from torch.utils.tensorboard import SummaryWriter
 
 class SimulationLogger:
@@ -7,6 +9,7 @@ class SimulationLogger:
     
     def __init__(self, log_dir="./logs"):
         self.writer = SummaryWriter(log_dir)
+        self.log_dir = log_dir
         
     def log_episode(self, simulation, episode, win=False, metrics=None):
         """エピソードごとのデータをTensorBoardとJSONに記録"""
@@ -29,12 +32,17 @@ class SimulationLogger:
         self.writer.add_scalar('GameResult/Win', win_value, episode)
         
     def save_episode_log(self, simulation, episode_num):
-        """各エピソードのログをJSONファイルに保存"""
+        """各エピソードのログをgzip圧縮して保存"""
         log_data = simulation.get_game_log()
         log_data['episode'] = episode_num
         
-        # JSONファイルに保存
-        with open(f"episode_{episode_num}_log.json", 'w') as f:
+        # エピソード単位で分割して保存（巨大化を防止）
+        log_dir = os.path.join(self.log_dir, "episode_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"episode_{episode_num}_log.json.gz")
+        
+        # gzip圧縮でJSONを保存
+        with gzip.open(log_file, 'wt') as f:
             json.dump(log_data, f, indent=2)
             
     def log_experiment_summary(self, win_count, total_episodes, avg_turns):

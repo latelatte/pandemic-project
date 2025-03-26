@@ -42,3 +42,31 @@ class Player:
         # ここで strategy() を呼び出して自前で4回行動してもよいし、
         # or 1アクションずつ繰り返す実装でもよい
         self.strategy()
+
+    def available_actions(self):
+        """利用可能なアクションのリストを返す"""
+        actions = []
+        
+        # 1. 移動アクション（複数タイプ）
+        actions.extend(self._get_movement_actions())
+        
+        # 2. 治療アクション
+        if self.city.infection_level > 0:
+            for disease_color in self.city.infections:
+                if self.city.infections[disease_color] > 0:
+                    actions.append({"type": "treat", "city": self.city, "color": disease_color})
+        
+        # 3. 知識の共有
+        actions.extend(self._get_share_knowledge_actions())
+        
+        # 4. 研究所の建設
+        if not self.city.has_research_station and self._can_build_research_station():
+            actions.append({"type": "build", "city": self.city})
+        
+        # 5. 治療薬の開発
+        if self._can_discover_cure():
+            for color in ["Blue", "Red", "Yellow", "Black"]:
+                if self._has_enough_cards_for_cure(color):
+                    actions.append({"type": "cure", "color": color})
+        
+        return actions

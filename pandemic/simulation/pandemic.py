@@ -1,4 +1,6 @@
 import random
+import json
+import os
 from pandemic.models.city import City
 from pandemic.models.card import Card
 from pandemic.models.player import Player
@@ -12,9 +14,18 @@ class PandemicSimulation:
     - デッキ: PlayerDeck, InfectionDeck
     - アウトブレイク数, 疫病の数など
     """
-    def __init__(self, *strategies, max_infection_level=3, outbreak_limit=8):
-        # 都市データ初期化
-        self.cities = PandemicSimulation.create_cities()
+    def __init__(self, *strategies, config_dir="./config", difficulty="normal"):
+        # 設定ファイルの読み込み
+        cities_config = self._load_config(config_dir, "cities_config.json")
+        diseases_config = self._load_config(config_dir, "diseases_config.json")
+        roles_config = self._load_config(config_dir, "roles_config.json")
+        game_config = self._load_config(config_dir, "game_config.json")
+        
+        # ゲーム難易度の設定
+        difficulty_settings = game_config["difficulty_levels"][difficulty]
+        
+        # 都市作成
+        self.cities = self._create_cities(cities_config)
         for city in self.cities:
             city.simulation = self
 
@@ -38,32 +49,67 @@ class PandemicSimulation:
         # 初期感染処理
         self.initial_infection()
 
-        self.max_infection_level = max_infection_level
-        self.outbreak_limit = outbreak_limit
+        self.max_infection_level = difficulty_settings["max_infection_level"]
+        self.outbreak_limit = difficulty_settings["outbreak_limit"]
         self.outbreak_count = 0
         self.turn_count = 0
         self.game_over = False
 
-    @staticmethod
-    def create_cities():
-        # デモ用に6都市 + 適当な隣接関係
-        city_names = ["Atlanta", "Chicago", "London", "Paris", "Beijing", "Tokyo"]
-        city_objects = [City(n) for n in city_names]
+    def _load_config(self, config_dir, filename):
+        """設定ファイルを読み込み、デフォルト値とマージする"""
+        filepath = os.path.join(config_dir, filename)
+        
+        # デフォルト設定（ファイルごとに異なる）
+        defaults = {
+            "game_config.json": {
+                "difficulty_levels": {
+                    "normal": {
+                        "epidemic_cards": 5,
+                        "player_cards_initial": 3,
+                        "player_cards_per_turn": 2,
+                        "max_infection_level": 3,
+                        "outbreak_limit": 8
+                    }
+                },
+                "actions_per_turn": 4,
+                "cards_needed_for_cure": 5,
+                "default_difficulty": "normal"
+            },
+            # 必要に応じて他の設定ファイルのデフォルト値も追加
+        }
+        
+        try:
+            with open(filepath, 'r') as f:
+                config = json.load(f)
+                print(f"Loaded config from {filepath}")
+                return config
+        except FileNotFoundError:
+            print(f"Warning: Config file {filepath} not found. Using defaults.")
+            return defaults.get(filename, {})
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON in {filepath}. Using defaults.")
+            return defaults.get(filename, {})
 
-        # 適当に接続 (全通に近いが例示)
-        connections = [
-            ("Atlanta", "Chicago"),
-            ("Chicago", "London"),
-            ("London", "Paris"),
-            ("Paris", "Beijing"),
-            ("Beijing", "Tokyo"),
-            ("Atlanta", "Tokyo"),  # Example cross-connection
-        ]
-        city_dict = {c.name: c for c in city_objects}
-        for c1, c2 in connections:
-            city_dict[c1].add_neighbour(city_dict[c2])
-
-        return city_objects
+    def _create_cities(self, config):
+        """設定に基づいて都市とネットワークを作成"""
+        cities = []
+        city_dict = {}
+        
+        # 都市作成
+        for city_data in config.get("cities", []):
+            city = City(city_data["name"])
+            if city_data.get("initial_research_station", False):
+                city.has_research_station = True
+            city_dict[city.name] = city
+            cities.append(city)
+            
+        # 接続関係設定
+        for conn in config.get("connections", []):
+            city1, city2 = conn
+            if city1 in city_dict and city2 in city_dict:
+                city_dict[city1].add_neighbour(city_dict[city2])
+                
+        return cities
 
     def _create_player_deck(self):
         # 色とか適当につける

@@ -15,14 +15,15 @@ class SimulationRunner:
         self.metrics = MetricsCollector()
         self.resource_monitor = ResourceMonitor()
 
-    def run_experiments(self, strategies):
+    def run_experiments(self, strategies, config_dir=None):
         """複数のエージェント戦略を評価"""
         # メトリクスコレクターの初期化
         agent_names = [name for _, name in strategies]
         self.metrics = MetricsCollector(agent_names)
         
         for ep in range(self.n_episodes):
-            sim = PandemicSimulation(*strategies)
+            # 設定ディレクトリを明示的に渡す
+            sim = PandemicSimulation(*strategies, config_dir=config_dir)
             
             # 実行時間の計測開始
             start_time = time.time()
@@ -115,6 +116,5 @@ class SimulationRunner:
 if __name__ == "__main__":
 
     runner = SimulationRunner(n_episodes=5)
-    runner.run_experiments(strategies)
 
     print("Done.")

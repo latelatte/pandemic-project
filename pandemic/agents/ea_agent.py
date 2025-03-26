@@ -1,4 +1,5 @@
 import random
+from deap import base, creator, tools, algorithms
 import numpy as np
 from pandemic.agents.baseline_agents import BaseAgent
 
@@ -34,104 +35,74 @@ class Individual:
         return Individual(genome=child_genome)
 
 class EAAgent(BaseAgent):
-    """進化的アルゴリズムを使用するエージェント"""
-    def __init__(self, name="EA", population_size=50, generations=10):
+    """DEAPを使った進化的アルゴリズムエージェント"""
+    def __init__(self, name="DEAP-EA", population_size=50, generations=10):
         super().__init__(name)
         self.population_size = population_size
         self.generations = generations
-        self.population = []
-        self.best_individual = None
+        self.genome_length = 20
         
-        # ゲノムパラメータの初期化
-        self.genome_length = 20  # アクション優先度の数
-        self.initialize_population()
+        # DEAP初期設定
+        self._setup_deap()
         
-    def initialize_population(self):
-        """初期集団を生成"""
-        self.population = [
-            Individual(genome_length=self.genome_length) 
-            for _ in range(self.population_size)
-        ]
+    def _setup_deap(self):
+        """DEAPのセットアップ"""
+        # 最大化問題の定義
+        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        # 個体の定義
+        creator.create("Individual", list, fitness=creator.FitnessMax)
+        
+        # ツールボックスの初期化
+        self.toolbox = base.Toolbox()
+        # 遺伝子の生成関数
+        self.toolbox.register("attr_float", random.random)
+        # 個体の生成
+        self.toolbox.register("individual", tools.initRepeat, 
+                             creator.Individual, self.toolbox.attr_float, self.genome_length)
+        # 集団の生成
+        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
+        
+        # 遺伝的操作の設定
+        self.toolbox.register("mate", tools.cxOnePoint)
+        self.toolbox.register("mutate", tools.mutGaussian, mu=0.5, sigma=0.2, indpb=0.2)
+        self.toolbox.register("select", tools.selTournament, tournsize=3)
         
     def evaluate_fitness(self, individual, player, simulation):
-        """個体の適応度（ゲームで勝つ確率）を評価"""
-        # 実際には複数回シミュレーションを実行して勝率を測定
-        # ここでは簡易実装としてゲノムから直接評価
+        """適応度評価関数"""
+        # 省略: 既存のコードと同様のロジック
+        # ...
         
-        # ゲノムを使ってアクション優先度を決定
-        action_priorities = {}
-        
-        # 移動アクション（隣接都市への移動の優先度）
-        for i, neighbor in enumerate(player.city.neighbours[:4]):  # 最大4都市まで
-            idx = i % len(individual.genome)
-            action_priorities[f"move_{neighbor.name}"] = individual.genome[idx]
-        
-        # 治療アクション（感染レベルが高いほど優先）
-        idx = 4 % len(individual.genome)
-        action_priorities["treat"] = individual.genome[idx] * player.city.infection_level
-        
-        # 研究所建設アクション
-        idx = 5 % len(individual.genome)
-        has_station = 1 if player.city.has_research_station else 0
-        action_priorities["build"] = individual.genome[idx] * (1 - has_station)
-        
-        # 現在の状態から推定した勝率
-        # 感染レベルが低いほど、研究所が多いほど勝率が高いと仮定
         total_infection = sum(city.infection_level for city in simulation.cities)
         total_stations = sum(1 for city in simulation.cities if city.has_research_station)
         
-        # 感染が0に近く、研究所が多いほど適応度が高い
         fitness = 1.0 - (total_infection / (len(simulation.cities) * 5))
         fitness += 0.2 * (total_stations / len(simulation.cities))
         
-        individual.fitness = max(0, min(1, fitness))
-        return individual.fitness
-        
-    def select_parents(self, tournament_size=3):
-        """トーナメント選択で親を選ぶ"""
-        participants = random.sample(self.population, tournament_size)
-        return max(participants, key=lambda ind: ind.fitness)
-        
-    def evolve(self, player, simulation):
-        """複数世代の進化計算を実行"""
-        # 現在の集団の適応度を評価
-        for individual in self.population:
-            self.evaluate_fitness(individual, player, simulation)
-            
-        for generation in range(self.generations):
-            new_population = []
-            
-            # エリート保存: 最良の個体をそのまま次世代に
-            elite = max(self.population, key=lambda ind: ind.fitness)
-            new_population.append(Individual(genome=elite.genome.copy()))
-            
-            # 残りは選択・交叉・突然変異で生成
-            while len(new_population) < self.population_size:
-                parent1 = self.select_parents()
-                parent2 = self.select_parents()
-                
-                # 交叉と突然変異
-                child = parent1.crossover(parent2)
-                child.mutate()
-                
-                new_population.append(child)
-                
-            # 集団の更新
-            self.population = new_population
-            
-            # 新集団の適応度評価
-            for individual in self.population:
-                self.evaluate_fitness(individual, player, simulation)
-                
-        # 最良個体を記録
-        self.best_individual = max(self.population, key=lambda ind: ind.fitness)
-        
+        return (max(0, min(1, fitness)),)  # DEAPは適応度をタプルで扱う
+    
     def decide_action(self, player, simulation):
-        """進化計算を使って最適なアクションを決定"""
-        # 進化計算で最良個体を探索
-        self.evolve(player, simulation)
+        """DEAPを使って最適なアクションを決定"""
+        # 評価関数をプレイヤーとシミュレーションに結びつける
+        self.toolbox.register("evaluate", self.evaluate_fitness, 
+                             player=player, simulation=simulation)
         
-        # 最良個体のゲノムを使ってアクションを決定
+        # 初期集団を生成
+        pop = self.toolbox.population(n=self.population_size)
+        
+        # 統計情報を設定
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("avg", np.mean)
+        stats.register("max", np.max)
+        
+        # 進化アルゴリズムの実行（eaSimpleはDEAP提供の標準的な遺伝的アルゴリズム）
+        pop, logbook = algorithms.eaSimple(
+            pop, self.toolbox, cxpb=0.7, mutpb=0.2, 
+            ngen=self.generations, stats=stats, verbose=False)
+        
+        # 最良個体の取得
+        best_ind = tools.selBest(pop, 1)[0]
+        
+        # 最良個体のゲノムを使ってアクションを選択（既存のロジック）
         possible_actions = self._get_possible_actions(player, simulation)
         
         if not possible_actions:
@@ -140,8 +111,8 @@ class EAAgent(BaseAgent):
         # ゲノムでアクションに優先度をつける
         action_scores = []
         for i, action in enumerate(possible_actions):
-            idx = i % len(self.best_individual.genome)
-            score = self.best_individual.genome[idx]
+            idx = i % len(best_ind)
+            score = best_ind[idx]
             
             # アクションのタイプによる調整
             if action["type"] == "treat" and player.city.infection_level > 0:
@@ -154,7 +125,7 @@ class EAAgent(BaseAgent):
         
         self.record_action("ea_decision", {
             "action": best_action,
-            "fitness": self.best_individual.fitness
+            "fitness": best_ind.fitness.values[0]
         })
         
         return best_action
