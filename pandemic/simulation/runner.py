@@ -180,11 +180,19 @@ class SimulationRunner:
 
     def make_timed_strategy(self, orig_strategy, agent_name):
         def timed_wrapper(player):
+            # リソースモニターを開始（これを追加）
+            self.resource_monitor.start_measurement(agent_name)
+            
+            # 既存のコード
             start_time = time.time()
             result = orig_strategy(player)
             end_time = time.time()
             elapsed = end_time - start_time
             self.metrics.record_action_time(agent_name, elapsed)
+            
+            # リソースモニターを終了（これを追加）
+            self.resource_monitor.end_measurement(agent_name)
+            
             return result
         return timed_wrapper
 
