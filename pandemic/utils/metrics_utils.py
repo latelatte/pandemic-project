@@ -41,7 +41,11 @@ class MetricsCollector:
         # 勝敗記録
         if win:
             for p in simulation.players:
+                # 勝率の記録
                 self.metrics['win_rates'][p.strategy_name] += 1/len(simulation.players)
+                
+                # 勝利貢献度も記録 (この行を実装されているか確認)
+                self.agent_stats[p.strategy_name]["win_contribution"] += 1
     
     def record_action_time(self, agent_name, time_taken):
         """エージェントのアクション実行時間を記録"""

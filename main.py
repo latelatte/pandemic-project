@@ -10,6 +10,7 @@ import sys
 
 import tensorboard
 
+
 from pandemic.simulation.pandemic import PandemicSimulation
 from pandemic.simulation.runner import SimulationRunner
 from pandemic.agents.baseline_agents import random_agent_strategy
@@ -21,7 +22,7 @@ def parse_args():
     """コマンドライン引数の解析"""
     parser = argparse.ArgumentParser(description='パンデミックシミュレーションでAIエージェントを比較')
     
-    parser.add_argument('--episodes', type=int, default=30,
+    parser.add_argument('--episodes', type=int, default=10,
                        help='実行するエピソード数 (デフォルト: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
                        help='ログと結果を保存するディレクトリ (デフォルト: ./logs)')
@@ -124,6 +125,10 @@ def main():
     # 実験ディレクトリのセットアップ
     log_dir = setup_experiment_dir(args.log_dir)
     print(f"実験結果は {log_dir} に保存されます")
+    
+    # TensorBoardの初期化
+    tb_dir = os.path.join(log_dir, "tensorboard")
+    os.makedirs(tb_dir, exist_ok=True)
     
     # エージェント戦略の準備
     strategies = get_agent_strategies(args.agents)

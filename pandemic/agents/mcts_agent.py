@@ -3,6 +3,7 @@ import random
 import time
 from copy import deepcopy
 from pandemic.agents.baseline_agents import BaseAgent
+import pickle
 
 class MCTSNode:
     def __init__(self, state, parent=None, action=None):
@@ -126,10 +127,101 @@ class MCTSAgent(BaseAgent):
         # ここでは簡易的に、50%の確率で勝利するとしておく
         return random.random() < 0.5
 
+    def save_state(self, filepath="mcts_agent_state.pkl"):
+        """エージェントの状態を保存"""
+        save_data = {
+            "action_stats": getattr(self, "action_stats", {}),
+            "visit_counts": getattr(self, "visit_counts", {}),
+            "value_sum": getattr(self, "value_sum", {}),
+        }
+        
+        with open(filepath, "wb") as f:
+            pickle.dump(save_data, f)
+        print(f"MCTSエージェントの状態を{filepath}に保存しました")
+        
+    def load_state(self, filepath="mcts_agent_state.pkl"):
+        """保存されたエージェントの状態を読み込み"""
+        try:
+            with open(filepath, "rb") as f:
+                save_data = pickle.load(f)
+                
+            self.action_stats = save_data.get("action_stats", {})
+            self.visit_counts = save_data.get("visit_counts", {})
+            self.value_sum = save_data.get("value_sum", {})
+            print(f"{filepath}からMCTSエージェントの状態を読み込みました")
+            return True
+        except:
+            print(f"{filepath}の読み込みに失敗しました")
+            return False
+            
+    def update_action_stats(self, state_hash, action, result):
+        """行動統計情報を更新して学習を蓄積"""
+        if not hasattr(self, "action_stats"):
+            self.action_stats = {}
+        if not hasattr(self, "visit_counts"):
+            self.visit_counts = {}
+        if not hasattr(self, "value_sum"):
+            self.value_sum = {}
+            
+        if state_hash not in self.action_stats:
+            self.action_stats[state_hash] = {}
+            self.visit_counts[state_hash] = {}
+            self.value_sum[state_hash] = {}
+            
+        action_key = self._action_to_key(action)
+        
+        if action_key not in self.action_stats[state_hash]:
+            self.action_stats[state_hash][action_key] = 0
+            self.visit_counts[state_hash][action_key] = 0
+            self.value_sum[state_hash][action_key] = 0.0
+            
+        self.visit_counts[state_hash][action_key] += 1
+        self.value_sum[state_hash][action_key] += result
+        self.action_stats[state_hash][action_key] = self.value_sum[state_hash][action_key] / self.visit_counts[state_hash][action_key]
+    
+    def _action_to_key(self, action):
+        """アクションを辞書のキーに変換"""
+        if not action:
+            return "None"
+        
+        if action.get("type") == "move":
+            city_name = action.get("target_city").name if action.get("target_city") else "unknown"
+            return f"move-{city_name}"
+        elif action.get("type") == "treat":
+            city_name = action.get("city").name if action.get("city") else "current"
+            return f"treat-{city_name}"
+        # 他のアクションタイプも同様に...
+        
+        return str(action)
+
+# グローバルエージェントインスタンス
+_global_mcts_agent = None
+
 # MCTS戦略関数
 def mcts_agent_strategy(player):
-    agent = MCTSAgent()
-    action = agent.decide_action(player, player.simulation)
+    global _global_mcts_agent
+    
+    # 実験ディレクトリを取得
+    import os
+    log_dir = player.simulation.log_dir if hasattr(player.simulation, 'log_dir') else "./logs"
+    state_file = os.path.join(log_dir, "mcts_agent_state.pkl")
+    
+    # デバッグ出力
+    print(f"DEBUG: MCTS戦略関数が呼ばれました - エージェントは{_global_mcts_agent}")
+    
+    if _global_mcts_agent is None:
+        _global_mcts_agent = MCTSAgent()
+        print(f"新しいMCTSエージェントを作成（保存先: {state_file}）")
+        # 状態を読み込む
+        _global_mcts_agent.load_state(filepath=state_file)
+    
+    action = _global_mcts_agent.decide_action(player, player.simulation)
+    
+    # 定期的に保存（1%の確率で保存）
+    if random.random() < 0.01:
+        _global_mcts_agent.save_state(filepath=state_file)
+    
+    # 以下アクション変換（既存コード）...
     
     if not action:
         return None  # アクションなし

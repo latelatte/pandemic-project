@@ -99,7 +99,8 @@ class EAAgent(BaseAgent):
             pop, self.toolbox, cxpb=0.7, mutpb=0.2, 
             ngen=self.generations, stats=stats, verbose=False)
         
-        # 最良個体の取得
+        # 最良個体の取得と保存（この行を追加）
+        self.best_population = pop  # この行を追加して集団を保存
         best_ind = tools.selBest(pop, 1)[0]
         
         # 最良個体のゲノムを使ってアクションを選択（既存のロジック）
@@ -130,6 +131,25 @@ class EAAgent(BaseAgent):
         
         return best_action
 
+    def save_state(self, filename="ea_agent_state.pkl"):
+        """学習状態を保存"""
+        import pickle
+        with open(filename, "wb") as f:
+            pickle.dump(self.best_population, f)
+        print(f"学習状態を {filename} に保存しました")
+
+    def load_state(self, filename="ea_agent_state.pkl"):
+        """学習状態を読み込み"""
+        import pickle
+        try:
+            with open(filename, "rb") as f:
+                self.best_population = pickle.load(f)
+            print(f"{filename} から学習状態を読み込みました")
+            return True
+        except:
+            print(f"{filename} が見つからないか無効です")
+            return False
+
     def _get_possible_actions(self, player, simulation):
         """可能なアクションリストを取得（ベースエージェントと同様）"""
         actions = []
@@ -152,10 +172,28 @@ class EAAgent(BaseAgent):
         
         return actions
 
-# EA戦略関数
+# グローバル変数でエージェントを保持
+_global_ea_agent = None  # 一度だけ初期化されるグローバルエージェント
+
 def ea_agent_strategy(player):
-    agent = EAAgent()
-    action = agent.decide_action(player, player.simulation)
+    global _global_ea_agent
+    
+    # 実験ディレクトリを取得
+    import os
+    log_dir = player.simulation.log_dir if hasattr(player.simulation, 'log_dir') else "./logs"
+    state_file = os.path.join(log_dir, "ea_agent_state.pkl")
+    
+    if _global_ea_agent is None:
+        _global_ea_agent = EAAgent()
+        print(f"新しいEAエージェントを作成（保存先: {state_file}）")
+        # 状態を読み込む
+        _global_ea_agent.load_state(filename=state_file)
+    
+    action = _global_ea_agent.decide_action(player, player.simulation)
+    
+    # 定期的に保存（1%の確率で保存）
+    if random.random() < 0.01:
+        _global_ea_agent.save_state(filename=state_file)
     
     if not action:
         return None  # アクションなし
@@ -171,7 +209,6 @@ def ea_agent_strategy(player):
         if target_city.infection_level > 0:
             return {"type": "treat", "target": target_city}
     
-    # その他のアクションタイプ...
     
     # アクションが無効な場合
     return None
