@@ -85,17 +85,16 @@ def create_performance_charts(results_dir, output_dir="./plots"):
     # テーマ設定
     sns.set_theme(style="whitegrid")
     
-    # 勝率比較チャート - ここを修正
+    # 勝率比較チャート
     plt.figure(figsize=(10, 6))
-    chart = sns.barplot(x="Agent", y="Win Rate (%)", data=df, palette="viridis")
-    if not df.empty:
-        chart.bar_label(chart.containers[0], fmt='%.1f%%')
+    chart = sns.barplot(x="Agent", y="Win Rate (%)", hue="Agent", data=df, palette="viridis", dodge=False)
+    chart.bar_label(chart.containers[0], fmt='%.1f%%')
     plt.title("Agent Win Rate Comparison", fontsize=16)
     plt.savefig(os.path.join(output_dir, "win_rate_comparison.png"))
     
-    # 計算時間比較 - ここも修正
+    # 計算時間比較チャート
     plt.figure(figsize=(10, 6))
-    sns.barplot(x="Agent", y="Avg Time (ms)", data=df, palette="rocket")
+    sns.barplot(x="Agent", y="Avg Time (ms)", hue="Agent", data=df, palette="rocket", dodge=False)
     plt.title("Agent Response Time Comparison", fontsize=16)
     plt.savefig(os.path.join(output_dir, "time_comparison.png"))
     

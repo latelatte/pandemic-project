@@ -1,6 +1,7 @@
 import time
 import os
 import json
+import math
 from pandemic.simulation.pandemic import PandemicSimulation
 from pandemic.utils.metrics_utils import MetricsCollector
 from pandemic.utils.logging_utils import SimulationLogger
@@ -55,30 +56,12 @@ class SimulationRunner:
             
             # 各エージェントの行動時間を記録するためのモニター設定
             for p in sim.players:
-                original_strategy = p.strategy
+                original_func = p.strategy_func  # strategy_funcを使用する
                 strategy_name = p.strategy_name
                 
-                # クロージャ変数を適切にキャプチャするように定義
-                def make_timed_strategy(player, orig_strategy, agent_name):
-                    def timed_strategy():
-                        # リソース計測開始
-                        self.resource_monitor.start_measurement(agent_name)  # 正しい変数を使用
-                        
-                        # 行動時間計測
-                        move_start = time.time()
-                        orig_strategy()  # プレイヤーを渡す
-                        move_end = time.time()
-                        
-                        # リソース計測終了
-                        self.resource_monitor.end_measurement(agent_name)  # 正しい変数を使用
-                        
-                        # 時間記録
-                        self.metrics.record_action_time(agent_name, move_end - move_start)
-                    
-                    return timed_strategy
-                
-                # 各プレイヤー専用の戦略関数を生成
-                p.strategy = make_timed_strategy(p, original_strategy, strategy_name)
+                # 時間計測用ラッパーを作成して設定する
+                p.strategy_func = self.make_timed_strategy(original_func, strategy_name)
+
             
             sim.run_game()
             
@@ -126,6 +109,23 @@ class SimulationRunner:
             "resource_usage": resource_summary
         }
         
+        def sanitize_metrics(data):
+            """NaNやInfを0に置換"""
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, (dict, list)):
+                        sanitize_metrics(v)
+                    elif isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                        data[k] = 0.0
+            elif isinstance(data, list):
+                for i, item in enumerate(data):
+                    if isinstance(item, (dict, list)):
+                        sanitize_metrics(item)
+                    elif isinstance(item, float) and (math.isnan(item) or math.isinf(item)):
+                        data[i] = 0.0
+
+        sanitize_metrics(metrics_data)
+
         metrics_file = os.path.join(self.logger.log_dir, "metrics.json")
         with open(metrics_file, "w") as f:
             json.dump(metrics_data, f, indent=2)
@@ -133,6 +133,16 @@ class SimulationRunner:
         
         self.print_summary()
         return metrics_data
+
+    def make_timed_strategy(self, orig_strategy, agent_name):
+        def timed_wrapper(player):
+            start_time = time.time()
+            result = orig_strategy(player)
+            end_time = time.time()
+            elapsed = end_time - start_time
+            self.metrics.record_action_time(agent_name, elapsed)
+            return result
+        return timed_wrapper
 
     def print_summary(self):
         """詳細な結果サマリーを出力"""

@@ -21,7 +21,7 @@ def parse_args():
     """コマンドライン引数の解析"""
     parser = argparse.ArgumentParser(description='パンデミックシミュレーションでAIエージェントを比較')
     
-    parser.add_argument('--episodes', type=int, default=30,
+    parser.add_argument('--episodes', type=int, default=10,
                        help='実行するエピソード数 (デフォルト: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
                        help='ログと結果を保存するディレクトリ (デフォルト: ./logs)')
@@ -32,10 +32,10 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=None,
                        help='乱数シードを固定 (再現性のため)')
     parser.add_argument('--visualize', action='store_true',
-                       help='実験結果を可視化')
+                       help='実験結果を可視化', default=True)
     parser.add_argument('--players', type=int, default=4,
                        help='プレイヤー数 (デフォルト: 4)')
-    parser.add_argument('--difficulty', type=str, default='normal',
+    parser.add_argument('--difficulty', type=str, default='easy',
                        choices=['easy', 'normal', 'hard'],
                        help='ゲーム難易度 (デフォルト: normal)')
     

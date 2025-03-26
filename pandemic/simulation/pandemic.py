@@ -30,12 +30,6 @@ class PandemicSimulation:
         for city in self.cities:
             city.simulation = self
 
-        # カードデッキ
-        self.player_deck = self._create_player_deck()
-        random.shuffle(self.player_deck)
-        self.infection_deck = self._create_infection_deck()
-        random.shuffle(self.infection_deck)
-
         # 役割の読み込みと作成
         self.roles = []
         for role_data in roles_config.get("roles", []):
@@ -47,7 +41,7 @@ class PandemicSimulation:
             self.roles.append(role)
 
         # プレイヤー生成と役割割り当て
-        player_count = num_players if num_players is not None else 4  # デフォルト4人
+        player_count = num_players if num_players is not None else 4
         self.players = []
 
         # 役割をシャッフル
@@ -76,6 +70,12 @@ class PandemicSimulation:
         for p in self.players:
             p.set_city(random.choice(self.cities))
 
+        # カードデッキ
+        self.player_deck = self._create_player_deck()
+        random.shuffle(self.player_deck)
+        self.infection_deck = self._create_infection_deck()
+        random.shuffle(self.infection_deck)
+
         # 初期感染処理
         self.initial_infection()
 
@@ -84,6 +84,7 @@ class PandemicSimulation:
         self.outbreak_count = 0
         self.turn_count = 0
         self.game_over = False
+        self.discovered_cures = []
 
     def _load_config(self, config_dir, filename):
         """設定ファイルを読み込み、デフォルト値とマージする"""
@@ -143,15 +144,22 @@ class PandemicSimulation:
 
     def _create_player_deck(self):
         # 色とか適当につける
-        citycards = []
         all_colors = ["Blue", "Red", "Yellow"]
-        for city in self.cities:
-            color = random.choice(all_colors)
-            citycards.append(Card("CITY", city_name=city.name, color=color))
+        
+        # 一例: プレイヤー数が多いほど都市カードを複製
+        multiplier = max(4, len(self.players) // 2)  # 4人なら multiplier=2
 
-        # エピデミックカード 2枚くらい
-        epidemic_cards = [Card("EPIDEMIC")] * 2
+        citycards = []
+        for city in self.cities:
+            for _ in range(multiplier):
+                citycards.append(Card("CITY", city_name=city.name, color=random.choice(all_colors)))
+
+        # エピデミックカード
+        epidemic_count = 5
+        epidemic_cards = [Card("EPIDEMIC")] * epidemic_count
+        
         deck = citycards + epidemic_cards
+        random.shuffle(deck)
         return deck
 
     def _create_infection_deck(self):
@@ -246,15 +254,34 @@ class PandemicSimulation:
             self.game_over = True
             print("Too many outbreaks -> You lose")
 
+    # 同じ色のカード5枚で治療薬開発
+    def discover_cure(self, player, color):
+    # 同じ色のカード5枚を集めているかチェック
+        color_cards = [card for card in player.hand if card.color == color]
+        if len(color_cards) >= 5 and player.city.has_research_station:
+            # 治療薬開発処理
+            for _ in range(5):
+                player.discard_card(color_cards.pop())
+            self.discovered_cures.append(color)
+            print(f"{player.name}が{color}色の治療薬を開発!")
+            return True
+        return False
+
+
     def check_game_end(self):
-        # 勝利判定(本来は4色の治療薬が完成か？)
-        # ここでは簡易的に city全部 infection_level == 0 ならwin
+        # 勝利条件1:全都市の感染度が0なら勝利
         if all(c.infection_level == 0 for c in self.cities):
             print("All cities are infection-free -> Win!")
             self.game_over = True
             return True
-        return self.game_over
+        # 勝利条件2:4色の治療薬が開発されたら勝利
+        if len(self.discovered_cures) >= 4:
+            print("全ての治療薬が開発されました → Win!")
+            self.game_over = True
+        
+        return False
 
+    
     def show_status(self):
         print("\n--- Current City Status ---")
         for c in self.cities:

@@ -16,9 +16,23 @@ class MCTSNode:
         
     def _get_untried_actions(self):
         """未試行のアクション一覧を取得"""
-        # state（ゲーム状態）から可能なアクションを取得
-        # ここではシミュレーションの状態から可能なアクションを取得する関数を呼び出すイメージ
-        return []  # 実際の実装ではゲームロジックに基づいて取得
+        # 実装を追加
+        actions = []
+        player = self.state.get("current_player")
+        if player and player.city:
+            # 移動アクション
+            for neighbor in player.city.neighbours:
+                actions.append({
+                    "type": "move", 
+                    "target_city": neighbor
+                })
+            # 治療アクション
+            if player.city.infection_level > 0:
+                actions.append({
+                    "type": "treat",
+                    "city": player.city
+                })
+        return actions
         
     def select_child(self, exploration_weight=1.0):
         """UCB1に基づく子ノード選択"""

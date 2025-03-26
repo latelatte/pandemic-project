@@ -38,32 +38,30 @@ class Player:
         self.strategy_func(self)
 
     def perform_turn(self):
-        """プレイヤーのターンを実行"""
-        actions_performed = 0
         actions_remaining = 4  # 標準的なPandemicでは4アクション
         
-        while actions_performed < actions_remaining:
-            if self.strategy_func:
-                # 戦略にゲーム状態情報を渡す
-                action = self.strategy_func(self)
-                
-                # デバッグ情報
-                if action:
-                    print(f"DEBUG: {self.name}が選択したアクション: {action.get('type')}")
-                else:
-                    print(f"DEBUG: {self.name}の戦略がアクションを返しませんでした")
-                    break  # アクションがなければ終了
-                    
-                # アクション実行
-                if action and self._execute_action(action):
-                    actions_performed += 1
-                else:
-                    # 無効なアクションか、失敗した場合は1回分消費
-                    print(f"{self.name}はアクションをスキップしました")
-                    actions_performed += 1
-            else:
-                print(f"{self.name}に戦略が設定されていません")
-                break
+        while actions_remaining > 0:
+            action = self.strategy_func(self) if self.strategy_func else None
+            
+            if not action:
+                print(f"{self.name}はアクションをスキップしました")
+                actions_remaining -= 1
+                continue
+            
+            success = False  # アクション実行の成否
+            
+            if action.get("type") == "move":
+                target = action.get("target")
+                if target:
+                    success = self.move_to(target)  # 移動の実行
+            
+            elif action.get("type") == "treat":
+                target = action.get("target") or self.city
+                if target and target.infection_level > 0:
+                    success = self.treat_disease(target)  # 治療の実行
+            
+            # アクションの実行結果に関わらずカウント
+            actions_remaining -= 1
 
     def available_actions(self):
         """利用可能なアクションのリストを返す"""
