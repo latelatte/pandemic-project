@@ -131,6 +131,50 @@ class SimulationRunner:
             json.dump(metrics_data, f, indent=2)
         print(f"メトリクスをJSONとして保存しました: {metrics_file}")
         
+        # 実験終了時に各グローバルエージェントの状態を保存
+        import pandemic.agents.ea_agent as ea
+        import pandemic.agents.mcts_agent as mcts
+        import pandemic.agents.marl_agent as marl
+        
+        # それぞれのグローバルエージェントが存在すれば状態を保存
+        if hasattr(ea, "_global_ea_agent") and ea._global_ea_agent:
+            ea._global_ea_agent.save_state(os.path.join(self.logger.log_dir, "ea_agent_state.pkl"))
+        
+        if hasattr(mcts, "_global_mcts_agent") and mcts._global_mcts_agent:
+            mcts._global_mcts_agent.save_state(os.path.join(self.logger.log_dir, "mcts_agent_state.pkl"))
+        
+        if hasattr(marl, "_global_marl_agent") and marl._global_marl_agent:
+            marl._global_marl_agent.save_state(os.path.join(self.logger.log_dir, "marl_agent_state.pt"))
+        
+        # 実験完了後に全エージェントの状態を保存
+        try:
+            for agent_name, _ in strategies:
+                if agent_name == "ea":
+                    # EAエージェントの状態保存
+                    from pandemic.agents.ea_agent import _global_ea_agent
+                    if _global_ea_agent:
+                        state_file = os.path.join(self.log_dir, "ea_agent_state.pkl")
+                        _global_ea_agent.save_state(filename=state_file)
+                        print(f"EAエージェントの状態を保存しました: {state_file}")
+                
+                elif agent_name == "mcts":
+                    # MCTSエージェントの状態保存
+                    from pandemic.agents.mcts_agent import _global_mcts_agent
+                    if _global_mcts_agent:
+                        state_file = os.path.join(self.log_dir, "mcts_agent_state.pkl")
+                        _global_mcts_agent.save_state(filepath=state_file)
+                        print(f"MCTSエージェントの状態を保存しました: {state_file}")
+                
+                elif agent_name == "marl":
+                    # MARLエージェントの状態保存
+                    from pandemic.agents.marl_agent import _global_marl_agent
+                    if _global_marl_agent:
+                        state_file = os.path.join(self.log_dir, "marl_agent_state.pt")
+                        _global_marl_agent.save_state(filepath=state_file)
+                        print(f"MARLエージェントの状態を保存しました: {state_file}")
+        except Exception as e:
+            print(f"エージェント状態の保存中にエラーが発生しました: {e}")
+        
         self.print_summary()
         return metrics_data
 

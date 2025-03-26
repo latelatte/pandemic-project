@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
+import os
 from pandemic.agents.baseline_agents import BaseAgent
 
 # ニューラルネットワークモデル
@@ -208,10 +209,81 @@ class MARLAgent(BaseAgent):
         
         return actions
 
+    def save_state(self, filepath="marl_agent_state.pt"):
+        """モデルの重みとトレーニング状態を保存"""
+        save_data = {
+            "model_state_dict": self.model.state_dict(),
+            "target_model_state_dict": self.target_model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "epsilon": self.epsilon,
+            "train_count": self.train_count
+        }
+        
+        torch.save(save_data, filepath)
+        print(f"MARLエージェントの状態を{filepath}に保存しました")
+        
+    def load_state(self, filepath="marl_agent_state.pt"):
+        try:
+            # まず指定パスを試す
+            if os.path.exists(filepath):
+                save_data = torch.load(filepath)
+                
+                self.model.load_state_dict(save_data["model_state_dict"])
+                self.target_model.load_state_dict(save_data["target_model_state_dict"])
+                self.optimizer.load_state_dict(save_data["optimizer_state_dict"])
+                self.epsilon = save_data.get("epsilon", self.epsilon)
+                self.train_count = save_data.get("train_count", 0)
+                
+                print(f"{filepath}からMARLエージェントの状態を読み込みました")
+                return True
+                
+            # 次に最新のログディレクトリを探す
+            log_dirs = sorted([d for d in os.listdir("./logs") if d.startswith("experiment_")])
+            if log_dirs:
+                latest_log = log_dirs[-1]
+                latest_path = f"./logs/{latest_log}/marl_agent_state.pt"
+                if os.path.exists(latest_path):
+                    print(f"代替パス {latest_path} から読み込みを試みます")
+                    save_data = torch.load(latest_path)
+                    
+                    self.model.load_state_dict(save_data["model_state_dict"])
+                    self.target_model.load_state_dict(save_data["target_model_state_dict"])
+                    self.optimizer.load_state_dict(save_data["optimizer_state_dict"])
+                    self.epsilon = save_data.get("epsilon", self.epsilon)
+                    self.train_count = save_data.get("train_count", 0)
+                    
+                    return True
+                
+            print("既存の状態ファイルが見つからないため、新規作成します")
+            return False
+        except Exception as e:
+            print(f"読み込みエラー: {e}")
+            return False
+
+# グローバルエージェントインスタンス
+_global_marl_agent = None
+
 # MARL戦略関数
 def marl_agent_strategy(player):
-    agent = MARLAgent()
-    action = agent.decide_action(player, player.simulation)
+    global _global_marl_agent
+    
+    # 実験ディレクトリを取得
+    import os
+    log_dir = player.simulation.log_dir if hasattr(player.simulation, 'log_dir') else "./logs"
+    state_file = os.path.join(log_dir, "marl_agent_state.pt")
+    
+    if _global_marl_agent is None:
+        _global_marl_agent = MARLAgent()
+        print(f"新しいMARLエージェントを作成（保存先: {state_file}）")
+        
+        # 明示的なファイルパスで読み込み
+        _global_marl_agent.load_state(filepath=state_file)
+    
+    action = _global_marl_agent.decide_action(player, player.simulation)
+    
+    # 保存時も同じパスを使用
+    if random.random() < 0.01:
+        _global_marl_agent.save_state(filepath=state_file)
     
     if not action:
         return None  # アクションなし
