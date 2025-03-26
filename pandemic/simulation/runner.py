@@ -66,7 +66,7 @@ class SimulationRunner:
             sim.run_game()
             
             # 勝敗判定
-            win = all(c.infection_level == 0 for c in sim.cities)
+            win = sim.is_win_condition()
             if win:
                 print(f"Episode {ep+1}: WIN.")
                 self.wins += 1

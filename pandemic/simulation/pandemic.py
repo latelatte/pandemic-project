@@ -170,12 +170,30 @@ class PandemicSimulation:
         return infdeck
 
     def initial_infection(self):
-        # 3枚引いて、それぞれ感染度上げるなど
+        """正確なパンデミックの初期感染ルール"""
+        # レベル3感染：3つの都市に3キューブずつ
+        for _ in range(3):
+            if self.infection_deck:
+                top_card = self.infection_deck.pop()
+                city_ = self.find_city(top_card.city_name)
+                city_.increase_infection(3)
+                print(f"初期感染: {city_.name}に3キューブ配置")
+        
+        # レベル2感染：3つの都市に2キューブずつ
+        for _ in range(3):
+            if self.infection_deck:
+                top_card = self.infection_deck.pop()
+                city_ = self.find_city(top_card.city_name)
+                city_.increase_infection(2)
+                print(f"初期感染: {city_.name}に2キューブ配置")
+        
+        # レベル1感染：3つの都市に1キューブずつ
         for _ in range(3):
             if self.infection_deck:
                 top_card = self.infection_deck.pop()
                 city_ = self.find_city(top_card.city_name)
                 city_.increase_infection(1)
+                print(f"初期感染: {city_.name}に1キューブ配置")
 
     def find_city(self, name):
         for c in self.cities:
@@ -267,20 +285,26 @@ class PandemicSimulation:
             return True
         return False
 
-
     def check_game_end(self):
-        # 勝利条件1:全都市の感染度が0なら勝利
-        if all(c.infection_level == 0 for c in self.cities):
-            print("All cities are infection-free -> Win!")
+        if self.is_win_condition():
+            print("Victory achieved!")
             self.game_over = True
             return True
-        # 勝利条件2:4色の治療薬が開発されたら勝利
-        if len(self.discovered_cures) >= 4:
-            print("全ての治療薬が開発されました → Win!")
-            self.game_over = True
+        
+        if self.game_over:
+            return True
         
         return False
-
+    
+    def is_win_condition(self):
+        """勝利条件を一元的に管理するメソッド"""
+        # 条件1: 感染レベルがしきい値以下
+        infection_controlled = all(c.infection_level <= 2 for c in self.cities)
+        
+        # 条件2: 治療薬が十分開発されている
+        cure_developed = len(self.discovered_cures) >= 3
+        
+        return infection_controlled or cure_developed
     
     def show_status(self):
         print("\n--- Current City Status ---")
@@ -311,6 +335,6 @@ class PandemicSimulation:
             ],
             "outbreak_count": self.outbreak_count,
             "game_over": self.game_over,
-            "win": all(c.infection_level == 0 for c in self.cities)
+            "win": self.is_win_condition()
         }
         return data
