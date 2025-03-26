@@ -115,12 +115,23 @@ class MCTSAgent(BaseAgent):
 # MCTS戦略関数
 def mcts_agent_strategy(player):
     agent = MCTSAgent()
-    while player.actions_remaining > 0:
-        action = agent.decide_action(player, player.simulation)
-        if not action:
-            break
-            
-        # アクション実行
-        # ...アクションのタイプに応じた処理
-        
-        player.actions_remaining -= 1
+    action = agent.decide_action(player, player.simulation)
+    
+    if not action:
+        return None  # アクションなし
+    
+    # アクション実行コード（これを追加）
+    if action.get("type") == "move":
+        target_city = action.get("target_city")
+        if target_city:
+            return {"type": "move", "target": target_city}
+    
+    elif action.get("type") == "treat":
+        target_city = action.get("city") or player.city
+        if target_city.infection_level > 0:
+            return {"type": "treat", "target": target_city}
+    
+    # その他のアクションタイプも同様に...
+    
+    # アクションが無効な場合
+    return None

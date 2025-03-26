@@ -1,19 +1,41 @@
 import time
+import os
+import json
 from pandemic.simulation.pandemic import PandemicSimulation
 from pandemic.utils.metrics_utils import MetricsCollector
 from pandemic.utils.logging_utils import SimulationLogger
 from pandemic.utils.resource_utils import ResourceMonitor
 
 class SimulationRunner:
-    def __init__(self, n_episodes=10, log_dir="./logs"):
+    """パンデミックシミュレーション実験の実行を管理するクラス"""
+    
+    def __init__(self, n_episodes=100, log_dir="./logs", num_players=4, difficulty="normal"):
+        """
+        初期化
+        
+        Args:
+            n_episodes: 実行するエピソード数
+            log_dir: ログと結果を保存するディレクトリ
+            num_players: 各シミュレーションのプレイヤー数
+            difficulty: ゲームの難易度 ("easy", "normal", "hard")
+        """
         self.n_episodes = n_episodes
+        self.log_dir = log_dir
+        self.num_players = num_players
+        self.difficulty = difficulty
+        
+        # 統計追跡用
         self.wins = 0
         self.losses = 0
         
-        # ユーティリティクラスのインスタンス化
-        self.logger = SimulationLogger(log_dir)
-        self.metrics = MetricsCollector()
+        # ロガーとモニターの初期化
+        self._setup_logging()
+        self.metrics = None  # あとで初期化
         self.resource_monitor = ResourceMonitor()
+        
+    def _setup_logging(self):
+        """ロガーの初期化"""
+        self.logger = SimulationLogger(self.log_dir)
 
     def run_experiments(self, strategies, config_dir=None):
         """複数のエージェント戦略を評価"""
@@ -22,8 +44,11 @@ class SimulationRunner:
         self.metrics = MetricsCollector(agent_names)
         
         for ep in range(self.n_episodes):
-            # 設定ディレクトリを明示的に渡す
-            sim = PandemicSimulation(*strategies, config_dir=config_dir)
+            # 新しいパラメータを追加してシミュレーションを作成
+            sim = PandemicSimulation(*strategies, 
+                                   config_dir=config_dir, 
+                                   num_players=self.num_players,  # 新しいパラメータ
+                                   difficulty=self.difficulty)    # 新しいパラメータ
             
             # 実行時間の計測開始
             start_time = time.time()
@@ -87,7 +112,27 @@ class SimulationRunner:
         # TensorBoardリソース解放
         self.logger.close()
         
+        # 結果をJSONとして保存
+        metrics_summary = self.metrics.get_summary()
+        resource_summary = self.resource_monitor.get_summary()
+        
+        # メトリクスをJSONファイルとして保存
+        metrics_data = {
+            "avg_turns": metrics_summary["avg_turns"],
+            "avg_outbreaks": metrics_summary["avg_outbreaks"],
+            "win_rate": self.wins / self.n_episodes,
+            "loss_rate": self.losses / self.n_episodes,
+            "agent_performance": metrics_summary["agent_performance"],
+            "resource_usage": resource_summary
+        }
+        
+        metrics_file = os.path.join(self.logger.log_dir, "metrics.json")
+        with open(metrics_file, "w") as f:
+            json.dump(metrics_data, f, indent=2)
+        print(f"メトリクスをJSONとして保存しました: {metrics_file}")
+        
         self.print_summary()
+        return metrics_data
 
     def print_summary(self):
         """詳細な結果サマリーを出力"""

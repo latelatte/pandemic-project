@@ -54,19 +54,23 @@ class RandomAgent(BaseAgent):
         
         return actions
 
-# ダミー戦略関数（SimulationRunnerから呼び出されるため）
+# RandomAgentの改良例
 def random_agent_strategy(player):
-    agent = RandomAgent()
-    while player.actions_remaining > 0:
-        action = agent.decide_action(player, player.simulation)
-        if not action:
-            break  # 行動不可能
-            
-        # アクション実行（タイプに応じた処理）
-        if action["type"] == "move":
-            player.move_to(action["target_city"])
-        elif action["type"] == "treat":
-            action["city"].treat_infection()
-        # その他のアクション処理
-        
-        player.actions_remaining -= 1
+    """ランダム行動選択の戦略"""
+    # 移動するか治療するかをランダム決定
+    action_type = random.choice(["move", "treat"])
+    
+    if action_type == "move" and player.city and player.city.neighbours:
+        # 隣接都市へランダム移動
+        target = random.choice(player.city.neighbours)
+        return {"type": "move", "target": target}
+    elif action_type == "treat" and player.city and player.city.infection_level > 0:
+        # 現在地の治療
+        return {"type": "treat", "target": player.city}
+    
+    # 他に選択肢がない場合、ランダムな隣接都市へ移動
+    if player.city and player.city.neighbours:
+        target = random.choice(player.city.neighbours)
+        return {"type": "move", "target": target}
+    
+    return None  # どのアクションも不可能な場合

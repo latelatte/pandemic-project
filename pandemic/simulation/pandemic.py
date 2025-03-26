@@ -4,6 +4,7 @@ import os
 from pandemic.models.city import City
 from pandemic.models.card import Card
 from pandemic.models.player import Player
+from pandemic.models.role import Role
 
 
 class PandemicSimulation:
@@ -14,7 +15,7 @@ class PandemicSimulation:
     - デッキ: PlayerDeck, InfectionDeck
     - アウトブレイク数, 疫病の数など
     """
-    def __init__(self, *strategies, config_dir="./config", difficulty="normal"):
+    def __init__(self, *strategies, config_dir="./config", difficulty="normal", num_players=None):
         # 設定ファイルの読み込み
         cities_config = self._load_config(config_dir, "cities_config.json")
         diseases_config = self._load_config(config_dir, "diseases_config.json")
@@ -35,11 +36,40 @@ class PandemicSimulation:
         self.infection_deck = self._create_infection_deck()
         random.shuffle(self.infection_deck)
 
-        # プレイヤー生成
+        # 役割の読み込みと作成
+        self.roles = []
+        for role_data in roles_config.get("roles", []):
+            role = Role(
+                name=role_data["name"],
+                description=role_data["description"],
+                abilities=role_data.get("abilities", {})
+            )
+            self.roles.append(role)
+
+        # プレイヤー生成と役割割り当て
+        player_count = num_players if num_players is not None else 4  # デフォルト4人
         self.players = []
-        for i, (func, name) in enumerate(strategies):
-            p = Player(f"Player{i+1}", func, name)
+
+        # 役割をシャッフル
+        available_roles = self.roles.copy()
+        random.shuffle(available_roles)
+
+        # 全エージェントに役割を割り当てる
+        for i in range(player_count):
+            strategy_index = i % len(strategies)  # 循環的に割り当て
+            func, name = strategies[strategy_index]
+            
+            # プレイヤー番号を名前に追加
+            player_name = f"{name}-{i+1}" if len(strategies) < player_count else name
+            
+            p = Player(player_name, func, name)
             p.simulation = self
+            
+            # 役割の割り当て（利用可能な役割から）
+            if available_roles:
+                role = available_roles.pop(0)
+                p.assign_role(role)
+            
             self.players.append(p)
 
         # プレイヤーをランダムな都市へ
@@ -245,9 +275,10 @@ class PandemicSimulation:
             "players": [
                 {"name": p.name,
                  "city": p.city.name if p.city else None,
-                 "role": p.role,
+                 "role": p.role.name if hasattr(p, 'role') and p.role else None,
+                 "role_description": p.role.description if hasattr(p, 'role') and p.role else None,
                  "strategy": p.strategy_name,
-                 "actions_taken": [],  # 実際のアクション履歴を追加するべき
+                 "actions_taken": [],
                  "hand": [str(card) for card in p.hand]}
                 for p in self.players
             ],

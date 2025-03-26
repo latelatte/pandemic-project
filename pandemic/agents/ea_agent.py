@@ -155,13 +155,24 @@ class EAAgent(BaseAgent):
 # EA戦略関数
 def ea_agent_strategy(player):
     agent = EAAgent()
-    while player.actions_remaining > 0:
-        action = agent.decide_action(player, player.simulation)
-        if not action:
-            break
-            
-        # アクション実行
-        # ...アクションのタイプに応じた処理
-        
-        player.actions_remaining -= 1
+    action = agent.decide_action(player, player.simulation)
+    
+    if not action:
+        return None  # アクションなし
+    
+    # アクション情報をPlayer.perform_turnが理解できる形式に変換
+    if action.get("type") == "move":
+        target_city = action.get("target_city")
+        if target_city:
+            return {"type": "move", "target": target_city}
+    
+    elif action.get("type") == "treat":
+        target_city = action.get("city") or player.city
+        if target_city.infection_level > 0:
+            return {"type": "treat", "target": target_city}
+    
+    # その他のアクションタイプ...
+    
+    # アクションが無効な場合
+    return None
 

@@ -18,8 +18,11 @@ class Player:
         self.city = city
 
     def move_to(self, city):
+        """都市間の移動。成功したらTrueを返す"""
         self.city = city
+        # ログ出力はここで行う（perform_turnでは行わない）
         print(f"[MOVE] {self.name} moved to {city.name} ({self.strategy_name})")
+        return True  # 移動が成功したことを示すため、Trueを返す
 
     def draw_card(self, card):
         self.hand.append(card)
@@ -35,13 +38,32 @@ class Player:
         self.strategy_func(self)
 
     def perform_turn(self):
-        """
-        1ターンで最大4アクション行う処理をまとめる
-        """
-        self.actions_remaining = 4
-        # ここで strategy() を呼び出して自前で4回行動してもよいし、
-        # or 1アクションずつ繰り返す実装でもよい
-        self.strategy()
+        """プレイヤーのターンを実行"""
+        actions_performed = 0
+        actions_remaining = 4  # 標準的なPandemicでは4アクション
+        
+        while actions_performed < actions_remaining:
+            if self.strategy_func:
+                # 戦略にゲーム状態情報を渡す
+                action = self.strategy_func(self)
+                
+                # デバッグ情報
+                if action:
+                    print(f"DEBUG: {self.name}が選択したアクション: {action.get('type')}")
+                else:
+                    print(f"DEBUG: {self.name}の戦略がアクションを返しませんでした")
+                    break  # アクションがなければ終了
+                    
+                # アクション実行
+                if action and self._execute_action(action):
+                    actions_performed += 1
+                else:
+                    # 無効なアクションか、失敗した場合は1回分消費
+                    print(f"{self.name}はアクションをスキップしました")
+                    actions_performed += 1
+            else:
+                print(f"{self.name}に戦略が設定されていません")
+                break
 
     def available_actions(self):
         """利用可能なアクションのリストを返す"""
@@ -70,3 +92,55 @@ class Player:
                     actions.append({"type": "cure", "color": color})
         
         return actions
+
+    def assign_role(self, role):
+        """役割を割り当てる"""
+        self.role = role
+        self.role_name = role.name
+        print(f"{self.name}に役割「{role.name}」が割り当てられました: {role.description}")
+
+    def use_ability(self, action_type, **kwargs):
+        """特殊能力を使用"""
+        if hasattr(self, 'role') and self.role:
+            return self.role.apply_ability(action_type, self, **kwargs)
+        return False
+
+    def treat_disease(self, city=None):
+        """治療アクション - 役割能力を活用"""
+        city = city or self.city
+        if city.infection_level <= 0:
+            return False
+        
+        # 役割能力のチェック
+        if hasattr(self, 'role') and self.role and self.role.name == "Medic":
+            # Medicの能力を使って全キューブ除去
+            print(f"🧪 {self.name} (Medic) 特殊能力: {city.name}の感染を完全に治療")
+            city.infection_level = 0
+            return True
+        
+        # 通常の治療
+        city.infection_level -= 1
+        print(f"{self.name}が{city.name}の感染を1段階治療しました")
+        return True
+
+    def build_research_station(self):
+        """研究所建設 - 役職能力対応"""
+        # Operations Expertの特殊能力を試す
+        if self.use_ability("build_research_station"):
+            self.city.has_research_station = True
+            return True
+        
+        # 通常の建設（都市カードが必要）
+        city_card = None
+        for card in self.hand:
+            if card.type == "city" and card.city_name == self.city.name:
+                city_card = card
+                break
+        
+        if city_card:
+            self.discard_card(city_card)
+            self.city.has_research_station = True
+            print(f"{self.name}が{self.city.name}に研究所を建設しました")
+            return True
+        
+        return False

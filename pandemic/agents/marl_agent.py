@@ -211,12 +211,26 @@ class MARLAgent(BaseAgent):
 # MARL戦略関数
 def marl_agent_strategy(player):
     agent = MARLAgent()
-    while player.actions_remaining > 0:
-        action = agent.decide_action(player, player.simulation)
-        if not action:
-            break
-            
-        # アクション実行
-        # ...アクションのタイプに応じた処理
-        
-        player.actions_remaining -= 1
+    action = agent.decide_action(player, player.simulation)
+    
+    if not action:
+        return None  # アクションなし
+    
+    # アクション情報をPlayer.perform_turnが理解できる形式に変換
+    if action.get("type") == "move":
+        target_city = action.get("target_city")
+        if target_city:
+            return {"type": "move", "target": target_city}
+    
+    elif action.get("type") == "treat":
+        city = action.get("city") or player.city
+        if city.infection_level > 0:
+            return {"type": "treat", "target": city}
+    
+    # その他のアクション...
+    # 例えば研究所建設など
+    elif action.get("type") == "build":
+        return {"type": "build", "target": player.city}
+    
+    # アクションが無効な場合
+    return None

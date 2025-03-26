@@ -21,7 +21,7 @@ def parse_args():
     """コマンドライン引数の解析"""
     parser = argparse.ArgumentParser(description='パンデミックシミュレーションでAIエージェントを比較')
     
-    parser.add_argument('--episodes', type=int, default=100,
+    parser.add_argument('--episodes', type=int, default=30,
                        help='実行するエピソード数 (デフォルト: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
                        help='ログと結果を保存するディレクトリ (デフォルト: ./logs)')
@@ -33,7 +33,11 @@ def parse_args():
                        help='乱数シードを固定 (再現性のため)')
     parser.add_argument('--visualize', action='store_true',
                        help='実験結果を可視化')
-    parser.add_argument("--visualize", action="store_true", help="実験後に結果を可視化する")
+    parser.add_argument('--players', type=int, default=4,
+                       help='プレイヤー数 (デフォルト: 4)')
+    parser.add_argument('--difficulty', type=str, default='normal',
+                       choices=['easy', 'normal', 'hard'],
+                       help='ゲーム難易度 (デフォルト: normal)')
     
     return parser.parse_args()
 
@@ -134,7 +138,12 @@ def main():
     start_time = time.time()
     
     # 設定ディレクトリを明示的に渡す
-    runner = SimulationRunner(n_episodes=args.episodes, log_dir=log_dir)
+    runner = SimulationRunner(
+        n_episodes=args.episodes, 
+        log_dir=log_dir,
+        num_players=args.players,
+        difficulty=args.difficulty
+    )
     results = runner.run_experiments(strategies, config_dir=config_dir)
     
     end_time = time.time()
@@ -152,7 +161,7 @@ def main():
     # 実験終了後、可視化（必要であれば）
     if args.visualize:
         print("結果を可視化しています...")
-        from pandemic.visualization.performance_charts import create_performance_charts
+        from visualization.performance_charts import create_performance_charts
         create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
         print(f"可視化結果を {log_dir}/plots に保存しました")
 
