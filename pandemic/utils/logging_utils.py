@@ -32,17 +32,19 @@ class SimulationLogger:
         self.writer.add_scalar('GameResult/Win', win_value, episode)
         
     def save_episode_log(self, simulation, episode_num):
-        """各エピソードのログをgzip圧縮して保存"""
+        """各エピソードのログを通常のJSONとして保存（圧縮なし）"""
         log_data = simulation.get_game_log()
         log_data['episode'] = episode_num
         
         # エピソード単位で分割して保存（巨大化を防止）
         log_dir = os.path.join(self.log_dir, "episode_logs")
         os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"episode_{episode_num}_log.json.gz")
         
-        # gzip圧縮でJSONを保存
-        with gzip.open(log_file, 'wt') as f:
+        # 圧縮なしのJSON形式に変更
+        log_file = os.path.join(log_dir, f"episode_{episode_num}_log.json")
+        
+        # 通常のJSON形式で保存
+        with open(log_file, 'w') as f:
             json.dump(log_data, f, indent=2)
             
     def log_experiment_summary(self, win_count, total_episodes, avg_turns):

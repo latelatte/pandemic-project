@@ -53,7 +53,7 @@ def visualize_interactive_map(game_log_file, output_file="pandemic_map.html"):
         color="infection",
         color_continuous_scale="Reds",
         projection="natural earth",
-        title=f"パンデミックシミュレーション状況（ターン {game_log['turn']}）"
+        title=f"Simulation State（Turn {game_log['turn']}）"
     )
     
     # 研究所マーカー追加

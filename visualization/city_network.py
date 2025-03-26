@@ -54,7 +54,7 @@ def visualize_game_state(game_log, output_file="city_network.png"):
     plt.legend(["プレイヤー位置"], loc="upper left")
     
     # タイトル
-    plt.title(f"パンデミックシミュレーション - ターン {game_log['turn']}")
+    plt.title(f"Simulation - Turn {game_log['turn']}")
     
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"ネットワーク図を保存しました: {output_file}")

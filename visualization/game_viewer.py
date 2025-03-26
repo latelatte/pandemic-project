@@ -117,19 +117,19 @@ class PandemicViewer:
         """ゲーム状態を描画"""
         # タイトル
         title_text = self.title_font.render(
-            f"パンデミックシミュレーション - ターン {self.game_data['turn']}", 
+            f"Simulation - Turn {self.game_data['turn']}", 
             True, self.colors["text"])
         self.screen.blit(title_text, (20, 20))
         
         # アウトブレイク数
         outbreak_text = self.font.render(
-            f"アウトブレイク: {self.game_data['outbreak_count']}", 
+            f"Outbreaks: {self.game_data['outbreak_count']}", 
             True, self.colors["text"])
         self.screen.blit(outbreak_text, (20, 60))
         
         # ゲーム終了状態
         if self.game_data["game_over"]:
-            result = "勝利！" if self.game_data["win"] else "敗北..."
+            result = "Wins！" if self.game_data["win"] else "Losses..."
             result_text = self.title_font.render(result, True, 
                                             (100, 255, 100) if self.game_data["win"] else (255, 100, 100))
             self.screen.blit(result_text, (self.width // 2 - result_text.get_width() // 2, 100))
