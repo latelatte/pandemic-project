@@ -96,15 +96,3 @@ class MetricsCollector:
         
         return summary
 
-    def treat_disease(self, city=None):
-        """治療アクション"""
-        # ...既存コード...
-        
-        # 治療成功時
-        if success:
-            # 治療記録 (この部分を追加)
-            if hasattr(self.simulation, 'metrics'):
-                self.simulation.metrics.record_treatment(self.strategy_name)
-        
-        return success
-
