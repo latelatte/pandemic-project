@@ -147,7 +147,7 @@ class PandemicSimulation:
         all_colors = ["Blue", "Red", "Yellow"]
         
 
-        multiplier = max(4, len(self.players) // 2)
+        multiplier = max(2, len(self.players) // 2)
 
         citycards = []
         for city in self.cities:
