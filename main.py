@@ -19,31 +19,30 @@ from pandemic.agents.ea_agent import ea_agent_strategy
 from pandemic.agents.marl_agent import marl_agent_strategy
 
 def parse_args():
-    """コマンドライン引数の解析"""
-    parser = argparse.ArgumentParser(description='パンデミックシミュレーションでAIエージェントを比較')
+    """for command line arguments"""
+    parser = argparse.ArgumentParser(description='pandemic simulation')
     
     parser.add_argument('--episodes', type=int, default=10,
-                       help='実行するエピソード数 (デフォルト: 10)')
+                       help='number of episodes to run (default: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
-                       help='ログと結果を保存するディレクトリ (デフォルト: ./logs)')
+                       help='directory to save logs (default: ./logs)')
     parser.add_argument('--agents', nargs='+', 
                        default=['random', 'mcts', 'ea', 'marl'],
                        choices=['random', 'mcts', 'ea', 'marl'],
-                       help='比較するエージェント (デフォルト: すべて)')
+                       help='list of agent strategies to use (default: all)')
     parser.add_argument('--seed', type=int, default=None,
-                       help='乱数シードを固定 (再現性のため)')
+                       help='random seed for reproducibility (default: None)')
     parser.add_argument('--visualize', action='store_true',
-                       help='実験結果を可視化', default=True)
+                       help='make plots', default=True)
     parser.add_argument('--players', type=int, default=4,
-                       help='プレイヤー数 (デフォルト: 4)')
+                       help='number of players (default: 4)')
     parser.add_argument('--difficulty', type=str, default='normal',
                        choices=['easy', 'normal', 'hard'],
-                       help='ゲーム難易度 (デフォルト: normal)')
+                       help='game difficulty (default: normal)')
     
     return parser.parse_args()
 
 def get_agent_strategies(agent_names):
-    """指定されたエージェント名から戦略関数のリストを作成"""
     agent_map = {
         'random': (random_agent_strategy, "RandomAgent"),
         'mcts': (mcts_agent_strategy, "MCTSAgent"),
@@ -56,22 +55,19 @@ def get_agent_strategies(agent_names):
         if name in agent_map:
             strategies.append(agent_map[name])
         else:
-            print(f"警告: 未知のエージェント '{name}' はスキップされました")
+            print(f"WARN: unknown agent '{name}' skipped.")
     
     return strategies
 
 def get_agent_names(agent_strategies):
-    """使用するエージェントの名前を簡潔にまとめる"""
-    # 短い形式にするため、'Agent'を取り除く
     names = [name.replace('Agent', '') for _, name in agent_strategies]
-    # エージェント名を連結（複数の場合はハイフンで区切る）
     if len(names) == 1:
-        return names[0]  # 単一エージェントの場合はそのまま
+        return names[0]
     else:
-        return "-".join(names)  # 複数エージェントの場合はハイフン区切り
-
+        return "-".join(names)
+    
 def setup_experiment_dir(base_log_dir, agent_strategies):
-    """使用エージェントの名前とタイムスタンプを含む実験ディレクトリを作成"""
+    """make experiment directory"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     agent_name = get_agent_names(agent_strategies)
     exp_dir = os.path.join(base_log_dir, f"experiment_{agent_name}_{timestamp}")
@@ -79,7 +75,6 @@ def setup_experiment_dir(base_log_dir, agent_strategies):
     return exp_dir
 
 def check_config_files():
-    # パッケージのルートディレクトリを特定
     config_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "pandemic", "config"
@@ -113,17 +108,15 @@ def check_config_files():
     return all_exist
 
 def main():
-    """メイン実行関数"""
+    """main function"""
     args = parse_args()
     
-    # 設定ディレクトリの絶対パス
     config_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "pandemic", "config"
     )
-    print(f"設定ディレクトリ: {config_dir}")
+    print(f"config directory: {config_dir}")
     
-    # 乱数シードの設定（指定されていれば）
     if args.seed is not None:
         import random
         import numpy as np
@@ -131,29 +124,24 @@ def main():
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
-        print(f"乱数シードを {args.seed} に設定")
+        print(f"set {args.seed} as random seed")
     
-    # 実験ディレクトリのセットアップ
     strategies = get_agent_strategies(args.agents)
     log_dir = setup_experiment_dir(args.log_dir, strategies)
-    print(f"実験結果は {log_dir} に保存されます")
+    print(f" experiments logs will save to {log_dir} ")
     
-    # TensorBoardの初期化
     tb_dir = os.path.join(log_dir, "tensorboard")
     os.makedirs(tb_dir, exist_ok=True)
     
-    # エージェント戦略の準備
     if not strategies:
-        print("エラー: 有効なエージェントが指定されていません")
+        print("error: no valid agent strategies selected")
         return
     
-    print(f"選択されたエージェント: {[name for _, name in strategies]}")
-    
-    # 実験実行
-    print(f"パンデミックシミュレーション実験を開始 ({args.episodes}エピソード)...")
+    print(f"selected agent: {[name for _, name in strategies]}")
+
+    print(f"star({args.episodes}")
     start_time = time.time()
     
-    # 設定ディレクトリを明示的に渡す
     runner = SimulationRunner(
         n_episodes=args.episodes, 
         log_dir=log_dir,
@@ -163,9 +151,8 @@ def main():
     results = runner.run_experiments(strategies, config_dir=config_dir)
     
     end_time = time.time()
-    print(f"実験完了。所要時間: {end_time - start_time:.2f}秒")
+    print(f"Finished. took: {end_time - start_time:.2f} seconds")
     
-    # 実験設定を保存
     with open(os.path.join(log_dir, "experiment_config.json"), "w") as f:
         json.dump({
             "episodes": args.episodes,
@@ -174,15 +161,14 @@ def main():
             "timestamp": datetime.now().isoformat()
         }, f, indent=2)
     
-    # 実験終了後、可視化（必要であれば）
     if args.visualize:
-        print("結果を可視化しています...")
+        print("visualizing results...")
         from visualization.performance_charts import create_performance_charts
-        from visualization.learning_curves import create_learning_curves  # 新しいインポート
+        from visualization.learning_curves import create_learning_curves
         
         create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
-        create_learning_curves(log_dir, os.path.join(log_dir, "plots"))  # 学習曲線を追加
-        print(f"可視化結果を {log_dir}/plots に保存しました")
+        create_learning_curves(log_dir, os.path.join(log_dir, "plots"))
+        print(f"images saved to {log_dir}/plots")
 
 if __name__ == "__main__":
     if check_config_files():

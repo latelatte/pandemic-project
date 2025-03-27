@@ -8,11 +8,11 @@ import json
 import glob
 
 def load_agent_data(results_dir):
-    """メトリクスファイルからエージェントデータをロード"""
+    """load agent performance data from JSON file"""
     metrics_file = os.path.join(results_dir, "metrics.json")
     
     if not os.path.exists(metrics_file):
-        print(f"Warning: メトリクスファイル {metrics_file} が見つかりません")
+        print(f"Warning: {metrics_file} not found.")
         return None
     
     try:
@@ -34,29 +34,25 @@ def load_agent_data(results_dir):
         return pd.DataFrame(agents_data) if agents_data else None
         
     except Exception as e:
-        print(f"データ読み込み中にエラー: {e}")
+        print(f"error: {e}")
         return None
 
 def aggregate_experiment_data(results_dir="./logs", n_latest=5, pattern="experiment_*"):
-    """複数の実験結果を統合して統計的に信頼性の高いデータを生成"""
-    # 実験ディレクトリを探す
+    """create a DataFrame from multiple experiment directories"""
     if os.path.isdir(results_dir) and not results_dir.endswith("logs"):
-        # 単一の実験ディレクトリが指定された場合
         experiment_dirs = [results_dir]
     else:
-        # logsディレクトリから最新のn_latest個の実験を見つける
         base_dir = results_dir if results_dir.endswith("logs") else "./logs"
         experiment_dirs = sorted([os.path.join(base_dir, d) for d in os.listdir(base_dir) 
                                if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("experiment_")])
         experiment_dirs = experiment_dirs[-n_latest:] if len(experiment_dirs) >= n_latest else experiment_dirs
     
-    # 全実験から集めたデータ
     all_agent_data = {}
     
     for exp_dir in experiment_dirs:
         metrics_file = os.path.join(exp_dir, "metrics.json")
         if not os.path.exists(metrics_file):
-            print(f"警告: {metrics_file} が見つかりません。スキップします。")
+            print(f"WARN: {metrics_file} not found.")
             continue
             
         try:
@@ -81,12 +77,12 @@ def aggregate_experiment_data(results_dir="./logs", n_latest=5, pattern="experim
                 all_agent_data[agent_name]["cpu"].append(cpu)
                 
         except Exception as e:
-            print(f"エラー: {metrics_file} の読み込み中に問題が発生しました: {e}")
+            print(f"error occured in processing on {metrics_file} : {e}")
     
-    # 集約データをDataFrameに変換
+    # convert to DataFrame
     aggregated_data = []
     for agent_name, data in all_agent_data.items():
-        if not data["win_rates"]:  # データがない場合はスキップ
+        if not data["win_rates"]:
             continue
             
         aggregated_data.append({
@@ -105,9 +101,7 @@ def aggregate_experiment_data(results_dir="./logs", n_latest=5, pattern="experim
     return pd.DataFrame(aggregated_data) if aggregated_data else None
 
 def compute_pareto_frontier(points):
-    """パレートフロンティアを計算
-    points: [(x, y)] の形式のリスト。xは最小化、yは最大化したい値。
-    """
+    """calculate the Pareto frontier from a list of points"""
     pareto_points = []
     for i, (x_i, y_i) in enumerate(points):
         is_dominated = False
@@ -122,11 +116,10 @@ def compute_pareto_frontier(points):
 
 def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, output_dir, 
                           size_col=None, minimize_x=True, maximize_y=True):
-    """2次元パレート分析チャート作成の汎用関数"""
+    """for 2D Pareto chart"""
     plt.figure(figsize=(12, 8))
     
     if size_col:
-        # サイズ変数がある場合は散布図にサイズ情報を含める
         scatter = sns.scatterplot(
             x=x_col, y=y_col, 
             hue="Agent", size=size_col,
@@ -140,7 +133,6 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
             data=df, alpha=0.7
         )
     
-    # エラーバーの追加
     for i, row in df.iterrows():
         x = row[x_col]
         y = row[y_col]
@@ -149,29 +141,23 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         
         plt.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='none', ecolor='gray', alpha=0.5)
     
-    # パレートフロンティア計算
     points = [(row[x_col], row[y_col]) for _, row in df.iterrows()]
     
-    # 最適化の方向を調整
     if not minimize_x:
         points = [(-x, y) for x, y in points]
     if not maximize_y:
         points = [(x, -y) for x, y in points]
     
     pareto_points = compute_pareto_frontier(points)
-    
-    # 方向を元に戻す
     if not minimize_x:
         pareto_points = [(-x, y) for x, y in pareto_points]
     if not maximize_y:
         pareto_points = [(x, -y) for x, y in pareto_points]
     
-    # パレートフロンティア線を描画
     if len(pareto_points) >= 2:
         pareto_x, pareto_y = zip(*pareto_points)
         plt.plot(pareto_x, pareto_y, 'k--', label='Pareto Frontier')
     
-    # 各点にエージェント名のラベルを追加
     for i, agent in enumerate(df["Agent"]):
         plt.annotate(
             agent,
@@ -181,7 +167,6 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
             fontsize=9
         )
     
-    # 最適化方向の矢印を追加
     max_x = plt.xlim()[1]
     min_x = plt.xlim()[0]
     max_y = plt.ylim()[1]
@@ -221,15 +206,12 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend(title="Agent", fontsize=10, title_fontsize=12)
     
-    # 最適領域にシェーディング
     if len(pareto_points) >= 2:
         pareto_x, pareto_y = zip(*pareto_points)
         if minimize_x and maximize_y:
-            # 左上が理想的な領域
             plt.fill_between(pareto_x, pareto_y, [max_y] * len(pareto_x), 
                             alpha=0.1, color='green', label='_ideal_region')
             
-            # 理想的な方向を示す矢印
             plt.annotate('Desireble', xy=(min_x + (max_x - min_x) * 0.2, max_y - (max_y - min_y) * 0.2),
                         xytext=(min_x + (max_x - min_x) * 0.3, max_y - (max_y - min_y) * 0.3),
                         arrowprops=dict(arrowstyle='->', color='green', alpha=0.5),
@@ -240,10 +222,9 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
     plt.close()
 
 def create_2d_pareto_analysis(df, output_dir):
-    """2次元パレート分析チャートを作成"""
+    """create 2D Pareto analysis charts"""
     os.makedirs(output_dir, exist_ok=True)
-    
-    # 時間 vs 勝率のパレート分析
+
     create_2d_pareto_chart(
         df, 
         "Avg Time (ms)", "Win Rate (%)",
@@ -254,7 +235,6 @@ def create_2d_pareto_analysis(df, output_dir):
         "Memory (MB)"
     )
     
-    # メモリ vs 勝率のパレート分析
     create_2d_pareto_chart(
         df, 
         "Memory (MB)", "Win Rate (%)",
@@ -266,7 +246,7 @@ def create_2d_pareto_analysis(df, output_dir):
     )
 
 def create_3d_visualization(df, output_dir):
-    """時間、メモリ、勝率の3次元可視化"""
+    """for 3D visualization of performance metrics"""
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
@@ -286,7 +266,6 @@ def create_3d_visualization(df, output_dir):
             s=150
         )
         
-        # 3D空間でのエラーバー
         for j, row in agent_data.iterrows():
             x = row['Avg Time (ms)']
             y = row['Memory (MB)']
@@ -295,33 +274,29 @@ def create_3d_visualization(df, output_dir):
             dy = row.get('Memory StdDev', 0)
             dz = row.get('Win Rate StdDev', 0)
             
-            # X方向のエラーバー
+            # X-axis error bar
             ax.plot([x-dx, x+dx], [y, y], [z, z], color='gray', alpha=0.3)
             
-            # Y方向のエラーバー
+            # Y-axis error bar
             ax.plot([x, x], [y-dy, y+dy], [z, z], color='gray', alpha=0.3)
             
-            # Z方向のエラーバー
+            # Z-axis error bar
             ax.plot([x, x], [y, y], [z-dz, z+dz], color='gray', alpha=0.3)
     
     ax.set_xlabel('Average Response Time (ms)', fontsize=12)
     ax.set_ylabel('Memory Usage (MB)', fontsize=12)
     ax.set_zlabel('Win Rate (%)', fontsize=12)
     
-    # 最適方向を示す矢印
     max_x = max(df['Avg Time (ms)'].max(), 1)
     max_y = max(df['Memory (MB)'].max(), 1)
     max_z = max(df['Win Rate (%)'].max(), 1)
     
-    # X軸(時間)最小化の矢印
     ax.quiver(max_x * 0.9, 0, 0, -max_x * 0.2, 0, 0, color='r', arrow_length_ratio=0.1, label='Minimize')
     ax.text(max_x * 0.8, 0, -max_z * 0.1, "Time ↓", color='r')
     
-    # Y軸(メモリ)最小化の矢印
     ax.quiver(0, max_y * 0.9, 0, 0, -max_y * 0.2, 0, color='r', arrow_length_ratio=0.1)
     ax.text(0, max_y * 0.8, -max_z * 0.1, "Memory ↓", color='r')
     
-    # Z軸(勝率)最大化の矢印
     ax.quiver(0, 0, max_z * 0.7, 0, 0, max_z * 0.2, color='g', arrow_length_ratio=0.1)
     ax.text(0, -max_y * 0.1, max_z * 0.8, "Win Rate ↑", color='g')
     
@@ -333,15 +308,13 @@ def create_3d_visualization(df, output_dir):
     plt.close()
 
 def create_radar_chart(df, output_dir):
-    """各エージェントの総合評価をレーダーチャートで可視化"""
-    # 正規化
+    """visualize performance metrics using radar chart"""
     df_norm = df.copy()
-    
-    # 評価指標のリスト（最大化したいものと最小化したいもの）
+
     maximize_metrics = ["Win Rate (%)"]
     minimize_metrics = ["Avg Time (ms)", "Memory (MB)"]
     
-    # 正規化処理
+    # normalize metrics
     for col in maximize_metrics + minimize_metrics:
         max_val = df[col].max()
         min_val = df[col].min()
@@ -349,44 +322,35 @@ def create_radar_chart(df, output_dir):
         
         if range_val > 0:
             if col in minimize_metrics:
-                # 小さい方が良い指標は反転（1に近いほど良い）
                 df_norm[col] = 1 - ((df[col] - min_val) / range_val)
             else:
-                # 大きい方が良い指標はそのまま正規化（1に近いほど良い）
                 df_norm[col] = (df[col] - min_val) / range_val
         else:
-            df_norm[col] = 0.5  # 全て同じ値の場合は中間値に設定
+            df_norm[col] = 0.5  # if no variation, set to 0.5
     
-    # 表示用のカテゴリ名
     categories = ['Win Rate', 'Time Efficiency', 'Memory Efficiency']
     
-    # レーダーチャートの作成
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, polar=True)
     
-    # カテゴリ数
     N = len(categories)
     
-    # 角度の設定
     angles = [n / float(N) * 2 * np.pi for n in range(N)]
-    angles += angles[:1]  # 閉じた図形にするために最初の要素を追加
+    angles += angles[:1]
     
-    # プロット線と塗りつぶし
     for i, agent in enumerate(df_norm['Agent'].unique()):
         agent_data = df_norm[df_norm['Agent'] == agent]
         values = agent_data[["Win Rate (%)", "Avg Time (ms)", "Memory (MB)"]].values.flatten().tolist()
-        values += values[:1]  # リストを閉じる
+        values += values[:1]
         
         ax.plot(angles, values, linewidth=2, linestyle='-', label=agent)
         ax.fill(angles, values, alpha=0.1)
     
-    # グラフの設定
     plt.xticks(angles[:-1], categories, fontsize=12)
     ax.set_rlabel_position(0)
     plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=10)
     plt.ylim(0, 1)
     
-    # 説明ラベルの追加
     plt.annotate('The higher the win rate, the better', xy=(0, 0.9), xytext=(0.2, 1.1), 
                 textcoords='axes fraction', ha='center',
                 arrowprops=dict(arrowstyle='->', color='blue'))
@@ -406,63 +370,59 @@ def create_radar_chart(df, output_dir):
     plt.close()
 
 def run_pareto_analysis(results_dir, output_dir=None, n_latest=5):
-    """パレート最適性分析の実行関数"""
     if output_dir is None:
         output_dir = os.path.join(os.path.dirname(results_dir) if os.path.isdir(results_dir) else results_dir, "plots")
     
     os.makedirs(output_dir, exist_ok=True)
     
-    # 複数実験の集約データを取得
-    print(f"最新{n_latest}回の実験データを集約中...")
+
+    print(f"accumulating latest{n_latest} files...")
     df = aggregate_experiment_data(results_dir, n_latest)
     
     if df is None or df.empty:
-        print("有効なエージェントデータがありません")
+        print("not found experiment data")
         return False
     
-    print(f"集計されたエージェント: {', '.join(df['Agent'].unique())}")
-    print(f"サンプル数: {df['n_samples'].iloc[0]}実験")
+    print(f"Agengts: {', '.join(df['Agent'].unique())}")
+    print(f"number of samples: {df['n_samples'].iloc[0]} experiments")
     
-    # 2次元パレート分析
-    print("2次元パレート分析チャートを作成中...")
+    # for 2D Pareto analysis
+    print("createing 2D pareto analysis...")
     create_2d_pareto_analysis(df, output_dir)
     
-    # 3D可視化
-    print("3次元パレート空間を可視化中...")
+    # for 3D visualization
+    print("creating 3D visualization...")
     create_3d_visualization(df, output_dir)
     
-    # レーダーチャート
-    print("レーダーチャートを作成中...")
+    # for radar chart
+    print("creating radar chart...")
     create_radar_chart(df, output_dir)
     
-    print(f"パレート最適性分析が完了しました: {output_dir}")
+    print(f"pareto analysis completed: {output_dir}")
     return True
 
-# コマンドラインからの実行サポート
 if __name__ == "__main__":
     import sys
     
-    # 最新の実験ディレクトリを探す
     def find_latest_experiment():
         log_dirs = sorted([d for d in os.listdir("./logs") if d.startswith("experiment_")])
         if not log_dirs:
             return None
         return os.path.join("./logs", log_dirs[-1])
     
-    # コマンドライン引数の解析
     import argparse
-    parser = argparse.ArgumentParser(description='パレート最適性分析ツール')
-    parser.add_argument('--dir', type=str, default="../logs", help='分析する実験ディレクトリ (デフォルト: 最新)')
-    parser.add_argument('--n_latest', type=int, default=5, help='集計する実験数 (デフォルト: 5)')
-    parser.add_argument('--output', type=str, default="./plots", help='出力ディレクトリ (デフォルト: <実験DIR>/plots)')
+    parser = argparse.ArgumentParser(description='pareto analysis')
+    parser.add_argument('--dir', type=str, default="../logs", help='target experiment directory (デフォルト: ../logs)')
+    parser.add_argument('--n_latest', type=int, default=5, help='number of latest experiments to analyze (デフォルト: 5)')
+    parser.add_argument('--output', type=str, default="./plots", help='output directory for plots (デフォルト: ./plots)')
     
     args = parser.parse_args()
     results_dir = args.dir if args.dir else find_latest_experiment()
     
     if not results_dir:
-        print("実験ディレクトリが見つかりません。")
+        print("not found experiment directory")
         sys.exit(1)
     
-    print(f"分析対象: {results_dir}")
+    print(f"target: {results_dir}")
     success = run_pareto_analysis(results_dir, args.output, args.n_latest)
-    print("分析完了" if success else "分析失敗")
+    print("done" if success else "failed")

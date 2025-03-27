@@ -1,9 +1,12 @@
 class Card:
     """
-    カードの種別: 
-      - CityCard: 都市カード(色付き)
-      - EpidemicCard: エピデミックを引き起こすカード
-      - EventCard: イベントカード(今回は未使用や実装省略可能)
+    Represents a card in the game.
+    Cards can be of different types, such as CITY or EPIDEMIC.
+    Each card may have additional attributes like city name and color.
+    Attributes:
+        card_type (str): The type of the card (e.g., 'CITY', 'EPIDEMIC').
+        city_name (str): The name of the city associated with the card, if applicable.
+        color (str): The color associated with the card, if applicable.
     """
     def __init__(self, card_type, city_name=None, color=None):
         self.card_type = card_type  # e.g. 'CITY', 'EPIDEMIC'

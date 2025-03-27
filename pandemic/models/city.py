@@ -1,17 +1,17 @@
 class City:
     """
-    都市クラス：名前、感染度、隣接リスト、研究所の有無などを管理
+    class for cities
     """
     def __init__(self, name):
         self.name = name
         self.infection_level = 0
         self.neighbours = []
         self.has_research_station = False
-        self.simulation = None  # 後でPandemicSimulationインスタンスを代入
+        self.simulation = None
 
     def add_neighbour(self, other_city):
         """
-        無向グラフなので、両方向でつながる
+        connects two cities
         """
         if other_city not in self.neighbours:
             self.neighbours.append(other_city)
@@ -20,17 +20,15 @@ class City:
 
     def increase_infection(self, n=1):
         """
-        感染度をnだけ増加
+        infection level increases by n
         """
         self.infection_level += n
-        # オーバーフローを避けるために最大値を仮に5に
-        # (実際のパンデミックでは3を超えるとアウトブレイク扱いだが)
-        if self.infection_level > 5:
-            self.infection_level = 5
+        if self.infection_level > 3:
+            self.infection_level = 3
 
     def treat_infection(self, n=1):
         """
-        感染度をnだけ減らす(治療)
+        treat infection level by n
         """
         if self.infection_level > 0:
             self.infection_level = max(0, self.infection_level - n)

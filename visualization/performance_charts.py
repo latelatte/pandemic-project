@@ -5,51 +5,44 @@ import seaborn as sns
 import pandas as pd
 
 def create_performance_charts(results_dir, output_dir="./plots"):
-    """エージェント性能の比較チャートを生成"""
+    """create performance charts from the results directory"""
     os.makedirs(output_dir, exist_ok=True)
-    
-    # メトリクスデータのロード
     metrics_file = os.path.join(results_dir, "metrics.json")
     
-    # metrics.jsonが見つからない場合は代替ファイルを探す
     if not os.path.exists(metrics_file):
-        print(f"Warning: メトリクスファイル {metrics_file} が見つかりません")
-        # experiment_config.jsonからメタデータを取得
+        print(f"Warning: metrics file {metrics_file} not found")
         config_file = os.path.join(results_dir, "experiment_config.json")
         if os.path.exists(config_file):
-            print(f"代替として {config_file} からデータを取得します")
-            # experiment_config.jsonを基本的なグラフ表示に使用
+            print(f"using alternatives from {config_file} ")
             try:
                 with open(config_file, 'r') as f:
                     config = json.load(f)
-                
-                # 基本的なエージェント情報を生成
+
                 agents_data = []
                 for agent in config.get("agents", []):
                     agents_data.append({
                         "Agent": agent,
-                        "Win Rate (%)": 0,  # ダミーデータ
-                        "Avg Time (ms)": 0,  # ダミーデータ
-                        "Memory (MB)": 0     # ダミーデータ
+                        "Win Rate (%)": 0,  #  dummy data
+                        "Avg Time (ms)": 0,  
+                        "Memory (MB)": 0  
                     })
                 
                 if agents_data:
                     df = pd.DataFrame(agents_data)
-                    # 設定情報をメモとして残す
                     plt.figure(figsize=(8, 6))
-                    plt.text(0.5, 0.5, f"シミュレーション設定:\n"
-                            f"エピソード数: {config.get('episodes', 'N/A')}\n"
-                            f"実行日時: {config.get('timestamp', 'N/A')}\n"
-                            f"エージェント: {', '.join(config.get('agents', []))}",
+                    plt.text(0.5, 0.5, f"simulation settings:\n"
+                            f"num of episodes: {config.get('episodes', 'N/A')}\n"
+                            f"date: {config.get('timestamp', 'N/A')}\n"
+                            f"Agent used: {', '.join(config.get('agents', []))}",
                             ha='center', va='center', fontsize=12)
                     plt.axis('off')
                     plt.savefig(os.path.join(output_dir, "simulation_info.png"))
                     plt.close()
                     
-                    print(f"シミュレーション設定情報を {output_dir} に保存しました")
+                    print(f"saved simulation details to {output_dir} .")
                     return True
             except Exception as e:
-                print(f"代替ファイル処理中にエラー: {e}")
+                print(f"error in altanative file process: {e}")
                 return False
         return False
     
@@ -57,10 +50,10 @@ def create_performance_charts(results_dir, output_dir="./plots"):
         with open(metrics_file, 'r') as f:
             data = json.load(f)
     except json.JSONDecodeError:
-        print(f"Error: メトリクスファイル {metrics_file} の形式が不正です")
+        print(f"Error:  {metrics_file} is not a valid JSON file")
         return False
         
-    # DataFrame作成
+    # get agent performance data
     agents_data = []
     try:
         for agent_name, metrics in data.get("agent_performance", {}).items():
@@ -72,33 +65,31 @@ def create_performance_charts(results_dir, output_dir="./plots"):
             }
             agents_data.append(agent_data)
     except (KeyError, AttributeError) as e:
-        print(f"Error: メトリクスデータの構造が予期しない形式です: {e}")
+        print(f"Error: unexpected data types: {e}")
         return False
     
-    # データが空なら処理終了
     if not agents_data:
-        print("警告: 有効なエージェントデータがありません")
+        print("WARN: No agent performance data found in the metrics file")
         return False
         
     df = pd.DataFrame(agents_data)
     
-    # テーマ設定
     sns.set_theme(style="whitegrid")
     
-    # 勝率比較チャート
+    # win rate comparison 
     plt.figure(figsize=(10, 6))
     chart = sns.barplot(x="Agent", y="Win Rate (%)", hue="Agent", data=df, palette="viridis", dodge=False)
     chart.bar_label(chart.containers[0], fmt='%.1f%%')
     plt.title("Agent Win Rate Comparison", fontsize=16)
     plt.savefig(os.path.join(output_dir, "win_rate_comparison.png"))
     
-    # 計算時間比較チャート
+    # time comparison
     plt.figure(figsize=(10, 6))
     sns.barplot(x="Agent", y="Avg Time (ms)", hue="Agent", data=df, palette="rocket", dodge=False)
     plt.title("Agent Response Time Comparison", fontsize=16)
     plt.savefig(os.path.join(output_dir, "time_comparison.png"))
     
-    # 性能とリソースのトレードオフ
+    # trade-off chart
     plt.figure(figsize=(10, 6))
     sns.scatterplot(x="Avg Time (ms)", y="Win Rate (%)", 
                   hue="Agent", size="Memory (MB)",
@@ -106,7 +97,7 @@ def create_performance_charts(results_dir, output_dir="./plots"):
     plt.title("Performance vs. Resource Trade-off", fontsize=16)
     plt.savefig(os.path.join(output_dir, "tradeoff.png"))
     
-    print(f"{len(df)} エージェントのパフォーマンスチャートを {output_dir} に保存しました")
+    print(f"{len(df)} performance chart saved in {output_dir} ")
     
-    # 成功を示す値を返す
+
     return True

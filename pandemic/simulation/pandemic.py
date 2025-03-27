@@ -9,28 +9,21 @@ from pandemic.models.role import Role
 
 class PandemicSimulation:
     """
-    メインのパンデミックシミュレーションクラス
-    - 都市
-    - プレイヤー
-    - デッキ: PlayerDeck, InfectionDeck
-    - アウトブレイク数, 疫病の数など
+    main class for the Pandemic simulation game.
+    Handles game initialization, player management, and game loop.
     """
     def __init__(self, *strategies, config_dir="./config", difficulty="normal", num_players=None):
-        # 設定ファイルの読み込み
         cities_config = self._load_config(config_dir, "cities_config.json")
         diseases_config = self._load_config(config_dir, "diseases_config.json")
         roles_config = self._load_config(config_dir, "roles_config.json")
         game_config = self._load_config(config_dir, "game_config.json")
         
-        # ゲーム難易度の設定
         difficulty_settings = game_config["difficulty_levels"][difficulty]
         
-        # 都市作成
         self.cities = self._create_cities(cities_config)
         for city in self.cities:
             city.simulation = self
 
-        # 役割の読み込みと作成
         self.roles = []
         for role_data in roles_config.get("roles", []):
             role = Role(
@@ -40,43 +33,35 @@ class PandemicSimulation:
             )
             self.roles.append(role)
 
-        # プレイヤー生成と役割割り当て
         player_count = num_players if num_players is not None else 4
         self.players = []
 
-        # 役割をシャッフル
         available_roles = self.roles.copy()
         random.shuffle(available_roles)
 
-        # 全エージェントに役割を割り当てる
         for i in range(player_count):
-            strategy_index = i % len(strategies)  # 循環的に割り当て
+            strategy_index = i % len(strategies)
             func, name = strategies[strategy_index]
             
-            # プレイヤー番号を名前に追加
             player_name = f"{name}-{i+1}" if len(strategies) < player_count else name
             
             p = Player(player_name, func, name)
             p.simulation = self
             
-            # 役割の割り当て（利用可能な役割から）
             if available_roles:
                 role = available_roles.pop(0)
                 p.assign_role(role)
             
             self.players.append(p)
 
-        # プレイヤーをランダムな都市へ
         for p in self.players:
             p.set_city(random.choice(self.cities))
 
-        # カードデッキ
         self.player_deck = self._create_player_deck()
         random.shuffle(self.player_deck)
         self.infection_deck = self._create_infection_deck()
         random.shuffle(self.infection_deck)
 
-        # 初期感染処理
         self.initial_infection()
 
         self.max_infection_level = difficulty_settings["max_infection_level"]
@@ -87,10 +72,9 @@ class PandemicSimulation:
         self.discovered_cures = []
 
     def _load_config(self, config_dir, filename):
-        """設定ファイルを読み込み、デフォルト値とマージする"""
+        """load configuration from JSON file and merge with defaults"""
         filepath = os.path.join(config_dir, filename)
         
-        # デフォルト設定（ファイルごとに異なる）
         defaults = {
             "game_config.json": {
                 "difficulty_levels": {
@@ -106,7 +90,6 @@ class PandemicSimulation:
                 "cards_needed_for_cure": 5,
                 "default_difficulty": "normal"
             },
-            # 必要に応じて他の設定ファイルのデフォルト値も追加
         }
         
         try:
@@ -122,11 +105,9 @@ class PandemicSimulation:
             return defaults.get(filename, {})
 
     def _create_cities(self, config):
-        """設定に基づいて都市とネットワークを作成"""
         cities = []
         city_dict = {}
         
-        # 都市作成
         for city_data in config.get("cities", []):
             city = City(city_data["name"])
             if city_data.get("initial_research_station", False):
@@ -134,7 +115,6 @@ class PandemicSimulation:
             city_dict[city.name] = city
             cities.append(city)
             
-        # 接続関係設定
         for conn in config.get("connections", []):
             city1, city2 = conn
             if city1 in city_dict and city2 in city_dict:
@@ -143,18 +123,17 @@ class PandemicSimulation:
         return cities
 
     def _create_player_deck(self):
-        # 色とか適当につける
         all_colors = ["Blue", "Red", "Yellow"]
         
-        # 一例: プレイヤー数が多いほど都市カードを複製
-        multiplier = max(4, len(self.players) // 2)  # 4人なら multiplier=2
+
+        multiplier = max(4, len(self.players) // 2)
 
         citycards = []
         for city in self.cities:
             for _ in range(multiplier):
                 citycards.append(Card("CITY", city_name=city.name, color=random.choice(all_colors)))
 
-        # エピデミックカード
+
         epidemic_count = 5
         epidemic_cards = [Card("EPIDEMIC")] * epidemic_count
         
@@ -163,37 +142,34 @@ class PandemicSimulation:
         return deck
 
     def _create_infection_deck(self):
-        # すべてCITYカード扱いだが、実際にはinfection card
         infdeck = []
         for city in self.cities:
             infdeck.append(Card("CITY", city_name=city.name, color="INF"))
         return infdeck
 
     def initial_infection(self):
-        """正確なパンデミックの初期感染ルール"""
-        # レベル3感染：3つの都市に3キューブずつ
         for _ in range(3):
             if self.infection_deck:
                 top_card = self.infection_deck.pop()
                 city_ = self.find_city(top_card.city_name)
                 city_.increase_infection(3)
-                print(f"初期感染: {city_.name}に3キューブ配置")
+                print(f"Inital infection: {city_.name} infected with 3 cubes")
         
-        # レベル2感染：3つの都市に2キューブずつ
+
         for _ in range(3):
             if self.infection_deck:
                 top_card = self.infection_deck.pop()
                 city_ = self.find_city(top_card.city_name)
                 city_.increase_infection(2)
-                print(f"初期感染: {city_.name}に2キューブ配置")
+                print(f"Initial infection: {city_.name} infected with 2 cubes")
         
-        # レベル1感染：3つの都市に1キューブずつ
+
         for _ in range(3):
             if self.infection_deck:
                 top_card = self.infection_deck.pop()
                 city_ = self.find_city(top_card.city_name)
                 city_.increase_infection(1)
-                print(f"初期感染: {city_.name}に1キューブ配置")
+                print(f"Initial indection: {city_.name} infected with 1 cube")
 
     def find_city(self, name):
         for c in self.cities:
@@ -203,7 +179,7 @@ class PandemicSimulation:
 
     def run_game(self):
         """
-        実際のメインループ: 全員のターンを回し、勝敗判定まで
+        actual game loop
         """
         print("==== Game start! ====")
         while not self.game_over:
@@ -214,9 +190,7 @@ class PandemicSimulation:
                 print(f"\n--- Turn {self.turn_count}: {p.name}'s move ---")
                 p.perform_turn()
 
-                # ターン後にプレイヤーカード2枚ドロー(省略的実装)
                 self.draw_player_cards(p)
-                # 感染フェーズ
                 self.infection_phase()
 
                 if self.check_game_end():
@@ -243,14 +217,13 @@ class PandemicSimulation:
         if not self.infection_deck:
             self.game_over = True
             return
-        bottom_card = self.infection_deck.pop(0)  # bottom
+        bottom_card = self.infection_deck.pop(0)
         city_ = self.find_city(bottom_card.city_name)
         print(f"Epidemic hits {city_.name}!")
         city_.increase_infection(2)
-        # discard pileシャッフル等は省略
+
 
     def infection_phase(self):
-        # 今は毎ターン 1枚だけ引いて infection
         if not self.infection_deck:
             print("Infection deck empty -> game might end soon")
             self.game_over = True
@@ -272,16 +245,14 @@ class PandemicSimulation:
             self.game_over = True
             print("Too many outbreaks -> You lose")
 
-    # 同じ色のカード5枚で治療薬開発
+
     def discover_cure(self, player, color):
-    # 同じ色のカード5枚を集めているかチェック
         color_cards = [card for card in player.hand if card.color == color]
         if len(color_cards) >= 5 and player.city.has_research_station:
-            # 治療薬開発処理
             for _ in range(5):
                 player.discard_card(color_cards.pop())
             self.discovered_cures.append(color)
-            print(f"{player.name}が{color}色の治療薬を開発!")
+            print(f"{player.name}developed {color} cure!")
             return True
         return False
 
@@ -297,11 +268,11 @@ class PandemicSimulation:
         return False
     
     def is_win_condition(self):
-        """勝利条件を一元的に管理するメソッド"""
-        # 条件1: 感染レベルがしきい値以下
+        """condition for winning the game"""
+        # 1: infection level is controlled
         infection_controlled = all(c.infection_level <= 2 for c in self.cities)
         
-        # 条件2: 治療薬が十分開発されている
+        # 2: all cures are discovered
         cure_developed = len(self.discovered_cures) >= 3
         
         return infection_controlled or cure_developed
