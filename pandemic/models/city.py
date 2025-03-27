@@ -8,6 +8,8 @@ class City:
         self.neighbours = []
         self.has_research_station = False
         self.simulation = None
+        self.outbreak_marker = False  # for preventing multiple outbreaks
+        self.disease_cubes = {}  # track disease cubes for each color
 
     def add_neighbour(self, other_city):
         """
@@ -18,13 +20,18 @@ class City:
         if self not in other_city.neighbours:
             other_city.neighbours.append(self)
 
-    def increase_infection(self, n=1):
-        """
-        infection level increases by n
-        """
-        self.infection_level += n
-        if self.infection_level > 3:
-            self.infection_level = 3
+    def increase_infection(self, amount, color="Blue"):
+        """increase infection level by amount"""
+        old_level = self.infection_level
+        self.infection_level += amount
+        
+        # track disease cubes for each color
+        if color not in self.disease_cubes:
+            self.disease_cubes[color] = 0
+        self.disease_cubes[color] += amount
+        
+        print(f"{self.name}: infection level {old_level} -> {self.infection_level}")
+        return self.infection_level
 
     def treat_infection(self, n=1):
         """
@@ -35,3 +42,12 @@ class City:
 
     def build_research_station(self):
         self.has_research_station = True
+
+    def get_infection_level(self, color="Blue"):
+        """get infection level for a specific color"""
+        return self.disease_cubes.get(color, 0)
+        
+    def set_infection_level(self, color, level):
+        self.disease_cubes[color] = level
+        # apply the level to the total infection level
+        self.infection_level = sum(self.disease_cubes.values())

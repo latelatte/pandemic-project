@@ -2,7 +2,14 @@ class Player:
     """
     class for player
     """
+    # クラス変数としてカウンタを追加
+    _id_counter = 0
+    
     def __init__(self, name, strategy_func, strategy_name, role=None):
+        # 一意のIDを割り当て
+        self.id = Player._id_counter
+        Player._id_counter += 1
+        
         self.name = name
         self.city = None
         self.hand = []

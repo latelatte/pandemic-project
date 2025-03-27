@@ -116,45 +116,41 @@ class SimulationRunner:
         metrics_file = os.path.join(self.logger.log_dir, "metrics.json")
         with open(metrics_file, "w") as f:
             json.dump(metrics_data, f, indent=2)
-        print(f"saves metrics as json: {metrics_file}")
+        print(f"Saved metrics data as JSON to {metrics_file}")
+
+        agent_state_dir = "./agents_state"
+        os.makedirs(agent_state_dir, exist_ok=True)
         
         import pandemic.agents.ea_agent as ea
         import pandemic.agents.mcts_agent as mcts
         import pandemic.agents.marl_agent as marl
         
-        if hasattr(ea, "_global_ea_agent") and ea._global_ea_agent:
-            ea._global_ea_agent.save_state(os.path.join(self.logger.log_dir, "ea_agent_state.pkl"))
-        
-        if hasattr(mcts, "_global_mcts_agent") and mcts._global_mcts_agent:
-            mcts._global_mcts_agent.save_state(os.path.join(self.logger.log_dir, "mcts_agent_state.pkl"))
-        
-        if hasattr(marl, "_global_marl_agent") and marl._global_marl_agent:
-            marl._global_marl_agent.save_state(os.path.join(self.logger.log_dir, "marl_agent_state.pt"))
-        
         try:
-            for agent_name, _ in strategies:
-                if agent_name == "ea":
-                    from pandemic.agents.ea_agent import _global_ea_agent
-                    if _global_ea_agent:
-                        state_file = os.path.join(self.log_dir, "ea_agent_state.pkl")
-                        _global_ea_agent.save_state(filename=state_file)
-                        print(f"saved state of EA agents: {state_file}")
-                
-                elif agent_name == "mcts":
-                    from pandemic.agents.mcts_agent import _global_mcts_agent
-                    if _global_mcts_agent:
-                        state_file = os.path.join(self.log_dir, "mcts_agent_state.pkl")
-                        _global_mcts_agent.save_state(filepath=state_file)
-                        print(f"saved state of MCTS agents: {state_file}")
-                
-                elif agent_name == "marl":
-                    from pandemic.agents.marl_agent import _global_marl_agent
-                    if _global_marl_agent:
-                        state_file = os.path.join(self.log_dir, "marl_agent_state.pt")
-                        _global_marl_agent.save_state(filepath=state_file)
-                        print(f"saved state of MARL agents: {state_file}")
+            if hasattr(ea, "_global_ea_agent") and ea._global_ea_agent:
+                state_file = os.path.join(agent_state_dir, "ea_agent_state.pkl")
+                ea._global_ea_agent.save_state(state_file)
+                print(f"Saved EA agent state to {state_file}")
+
+                backup_file = os.path.join(self.logger.log_dir, "ea_agent_state.pkl")
+                ea._global_ea_agent.save_state(backup_file)
+            
+            if hasattr(mcts, "_global_mcts_agent") and mcts._global_mcts_agent:
+                state_file = os.path.join(agent_state_dir, "mcts_agent_state.pkl")
+                mcts._global_mcts_agent.save_state(state_file)
+                print(f"Saved MCTS agent state to {state_file}")
+
+                backup_file = os.path.join(self.logger.log_dir, "mcts_agent_state.pkl")
+                mcts._global_mcts_agent.save_state(backup_file)
+            
+            if hasattr(marl, "_global_marl_agent") and marl._global_marl_agent:
+                state_file = os.path.join(agent_state_dir, "marl_agent_state.pt")
+                marl._global_marl_agent.save_state(state_file)
+                print(f"Saved MARL agent state to {state_file}")
+
+                # backup_file = os.path.join(self.logger.log_dir, "marl_agent_state.pt")
+                # marl._global_marl_agent.save_state(backup_file)
         except Exception as e:
-            print(f"error in proccessing saving agents state: {e}")
+            print(f"Error saving agent states {e}")
         
         self.print_summary()
         return metrics_data

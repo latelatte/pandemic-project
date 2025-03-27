@@ -88,5 +88,5 @@ def create_learning_curves(logs_dir, output_dir=None):
     plt.savefig(os.path.join(output_dir, "learning_curve_turns.png"), dpi=300)
     plt.close()
     
-    print(f"learning curves saved in {output_dir}.")
+    print(f"learning curves saved to {output_dir}.")
     return True

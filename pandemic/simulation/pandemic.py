@@ -71,6 +71,27 @@ class PandemicSimulation:
         self.game_over = False
         self.discovered_cures = []
 
+        # 感染率トラック（エピデミックカードが引かれるたびに上昇）
+        self.infection_rates = [2, 2, 2, 3, 3, 4, 4]  # 標準的なパンデミックの感染率段階
+        self.infection_rate_index = 0
+        
+        # 疾病の初期化
+        self.diseases = []
+        disease_colors = ["Blue", "Red", "Yellow", "Black"]
+        for color in disease_colors[:3]:  # 簡易バージョンでは3色のみ使用
+            self.diseases.append({
+                "color": color,
+                "cured": False,
+                "eradicated": False
+            })
+        
+        # ゲームの状態追跡用変数
+        self.player_discard_pile = []
+        self.infection_discard_pile = []
+        
+        # 難易度設定から初期感染率を取得
+        self.infection_rate_index = difficulty_settings.get("initial_infection_rate_index", 0)
+
     def _load_config(self, config_dir, filename):
         """load configuration from JSON file and merge with defaults"""
         filepath = os.path.join(config_dir, filename)
@@ -95,7 +116,7 @@ class PandemicSimulation:
         try:
             with open(filepath, 'r') as f:
                 config = json.load(f)
-                print(f"Loaded config from {filepath}")
+                # print(f"Loaded config from {filepath}")
                 return config
         except FileNotFoundError:
             print(f"Warning: Config file {filepath} not found. Using defaults.")
@@ -193,7 +214,8 @@ class PandemicSimulation:
                 self.draw_player_cards(p)
                 self.infection_phase()
 
-                if self.check_game_end():
+                if self.is_win_condition():
+                    print("Victory! All diseases cured!")
                     self.game_over = True
                     break
 
@@ -212,70 +234,145 @@ class PandemicSimulation:
             else:
                 player.draw_card(card)
                 print(f"{player.name} drew {card}")
-
+                
+    @property
+    def infection_rate(self):
+        """現在の感染率を返す"""
+        if self.infection_rate_index < len(self.infection_rates):
+            return self.infection_rates[self.infection_rate_index]
+        return self.infection_rates[-1]
+    
     def epidemic(self):
         if not self.infection_deck:
             self.game_over = True
             return
+        
+        # 1. 感染率を上げる
+        if self.infection_rate_index < len(self.infection_rates) - 1:
+            self.infection_rate_index += 1
+            print(f"Infection rate increased to {self.infection_rate}")
+        
+        # 2. 底のカードを引いて直ちに感染させる
         bottom_card = self.infection_deck.pop(0)
         city_ = self.find_city(bottom_card.city_name)
         print(f"Epidemic hits {city_.name}!")
-        city_.increase_infection(2)
-
+        city_.increase_infection(3)  # エピデミック時は3キューブ（またはアウトブレイク）
+        
+        # 3. 感染カード山札を再構築（捨て札をシャッフルして山札の上に）
+        if self.infection_discard_pile:
+            random.shuffle(self.infection_discard_pile)
+            self.infection_deck.extend(self.infection_discard_pile)
+            self.infection_discard_pile = []
+            print("Infection discard pile shuffled and placed on top of infection deck")
 
     def infection_phase(self):
-        if not self.infection_deck:
-            print("Infection deck empty -> game might end soon")
-            self.game_over = True
-            return
-        card = self.infection_deck.pop()
-        c = self.find_city(card.city_name)
-        c.increase_infection(1)
-        if c.infection_level > self.max_infection_level:
-            # outbreak
-            self.handle_outbreak(c)
+        """感染フェーズ - 現在の感染率に従ってカードを引く"""
+        cards_to_draw = self.infection_rate
+        print(f"Drawing {cards_to_draw} infection cards...")
+        
+        for _ in range(cards_to_draw):
+            if not self.infection_deck:
+                print("Infection deck empty -> game might end soon")
+                self.game_over = True
+                return
+                
+            card = self.infection_deck.pop()
+            self.infection_discard_pile.append(card)
+            c = self.find_city(card.city_name)
+            
+            # 病気が根絶されていない場合のみ感染
+            disease_color = card.color if hasattr(card, 'color') and card.color != "INF" else "Blue"
+            is_eradicated = False
+            
+            for disease in self.diseases:
+                if disease["color"] == disease_color and disease["eradicated"]:
+                    is_eradicated = True
+                    break
+                    
+            if not is_eradicated:
+                c.increase_infection(1)
+                print(f"{c.name} infected with {disease_color}")
+                if c.infection_level > self.max_infection_level:
+                    # outbreak
+                    self.handle_outbreak(c, disease_color)
+            else:
+                print(f"{c.name} would be infected, but {disease_color} disease is eradicated")
 
-    def handle_outbreak(self, city):
+    def handle_outbreak(self, city, disease_color="Blue"):
+        """アウトブレイクの処理 - 再帰的な伝播を追加"""
         self.outbreak_count += 1
         print(f"Outbreak at {city.name}, outbreak count: {self.outbreak_count}")
-        city.infection_level = self.max_infection_level  # saturate
+        city.infection_level = self.max_infection_level  # 最大値で制限
+        city.outbreak_marker = True  # このターンですでにアウトブレイクした都市をマーク
+        
         for nb in city.neighbours:
-            nb.increase_infection(1)
+            # 再帰的なアウトブレイクを防ぐためのチェック
+            if not getattr(nb, 'outbreak_marker', False):
+                nb.increase_infection(1)
+                if nb.infection_level > self.max_infection_level:
+                    self.handle_outbreak(nb, disease_color)
+        
         if self.outbreak_count >= self.outbreak_limit:
             self.game_over = True
             print("Too many outbreaks -> You lose")
 
-
     def discover_cure(self, player, color):
+        """治療薬の発見処理を改善"""
+        # 必要なカード数（科学者の場合は4枚、それ以外は5枚）
+        cards_needed = 4 if hasattr(player, 'role') and player.role.name == "Scientist" else 5
+        
         color_cards = [card for card in player.hand if card.color == color]
-        if len(color_cards) >= 5 and player.city.has_research_station:
-            for _ in range(5):
+        if len(color_cards) >= cards_needed and player.city.has_research_station:
+            # 特定の色のカードを捨てる
+            for _ in range(cards_needed):
                 player.discard_card(color_cards.pop())
-            self.discovered_cures.append(color)
-            print(f"{player.name}developed {color} cure!")
-            return True
-        return False
-
-    def check_game_end(self):
-        if self.is_win_condition():
-            print("Victory achieved!")
-            self.game_over = True
-            return True
-        
-        if self.game_over:
-            return True
-        
+            
+            # 病気を治療済みにする
+            for disease in self.diseases:
+                if disease["color"] == color:
+                    disease["cured"] = True
+                    print(f"{player.name} developed {color} cure!")
+                    
+                    # 全ての治療薬が見つかったか確認
+                    if all(d["cured"] for d in self.diseases):
+                        print("All diseases cured! Victory is near!")
+                    return True
         return False
     
+    def treat_disease(self, player, city, color=None):
+        """病気の治療処理 - 色を指定可能に"""
+        # 治療する色を決定
+        if color is None:
+            # デフォルトの色を使用
+            color = "Blue"  # または他の方法で決定
+        
+        # この色の病気が治療済みかチェック
+        is_cured = False
+        for disease in self.diseases:
+            if disease["color"] == color and disease["cured"]:
+                is_cured = True
+                break
+        
+        # 治療処理
+        if city.infection_level > 0:
+            if is_cured:
+                # 治療済みの場合はすべてのキューブを除去
+                old_level = city.infection_level
+                city.infection_level = 0
+                print(f"{player.name} removed all {old_level} disease cubes from {city.name} ({color} is cured)")
+            else:
+                # 未治療の場合は1つだけ除去
+                city.infection_level -= 1
+                print(f"{player.name} removed 1 disease cube from {city.name}")
+            return True
+        return False
+
     def is_win_condition(self):
-        """condition for winning the game"""
-        # 1: infection level is controlled
-        infection_controlled = all(c.infection_level <= 2 for c in self.cities)
+        """勝利条件を改善"""
+        # 全ての病気が治療済み
+        all_diseases_cured = all(disease["cured"] for disease in self.diseases)
         
-        # 2: all cures are discovered
-        cure_developed = len(self.discovered_cures) >= 3
-        
-        return infection_controlled or cure_developed
+        return all_diseases_cured
     
     def show_status(self):
         print("\n--- Current City Status ---")

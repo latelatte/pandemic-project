@@ -97,7 +97,7 @@ def create_performance_charts(results_dir, output_dir="./plots"):
     plt.title("Performance vs. Resource Trade-off", fontsize=16)
     plt.savefig(os.path.join(output_dir, "tradeoff.png"))
     
-    print(f"{len(df)} performance chart saved in {output_dir} ")
+    print(f"{len(df)} performance chart saved to {output_dir} ")
     
 
     return True

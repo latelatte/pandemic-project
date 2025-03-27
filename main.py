@@ -22,7 +22,7 @@ def parse_args():
     """for command line arguments"""
     parser = argparse.ArgumentParser(description='pandemic simulation')
     
-    parser.add_argument('--episodes', type=int, default=10,
+    parser.add_argument('--episodes', type=int, default=1,
                        help='number of episodes to run (default: 10)')
     parser.add_argument('--log-dir', type=str, default='./logs',
                        help='directory to save logs (default: ./logs)')
@@ -80,7 +80,7 @@ def check_config_files():
         "pandemic", "config"
     )
     
-    print(f"Checking config files in: {config_dir}")
+    # print(f"Checking config files in: {config_dir}")
     
     config_files = [
         "cities_config.json",
@@ -93,11 +93,11 @@ def check_config_files():
     for filename in config_files:
         filepath = os.path.join(config_dir, filename)
         if os.path.exists(filepath):
-            print(f"✓ {filename} exists")
+            # print(f"✓ {filename} exists")
             try:
                 with open(filepath, 'r') as f:
                     data = json.load(f)
-                print(f"  JSON is valid, keys: {list(data.keys())}")
+                # print(f"  JSON is valid, keys: {list(data.keys())}")
             except json.JSONDecodeError:
                 print(f"✗ {filename} contains invalid JSON")
                 all_exist = False
@@ -115,7 +115,7 @@ def main():
         os.path.dirname(os.path.abspath(__file__)),
         "pandemic", "config"
     )
-    print(f"config directory: {config_dir}")
+    # print(f"config directory: {config_dir}")
     
     if args.seed is not None:
         import random
@@ -128,7 +128,7 @@ def main():
     
     strategies = get_agent_strategies(args.agents)
     log_dir = setup_experiment_dir(args.log_dir, strategies)
-    print(f" experiments logs will save to {log_dir} ")
+    print(f"experiments logs will save to {log_dir} ")
     
     tb_dir = os.path.join(log_dir, "tensorboard")
     os.makedirs(tb_dir, exist_ok=True)
@@ -139,7 +139,7 @@ def main():
     
     print(f"selected agent: {[name for _, name in strategies]}")
 
-    print(f"star({args.episodes}")
+    print(f"starting episode {args.episodes}")
     start_time = time.time()
     
     runner = SimulationRunner(
@@ -162,13 +162,13 @@ def main():
         }, f, indent=2)
     
     if args.visualize:
-        print("visualizing results...")
+        #print("visualizing results...")
         from visualization.performance_charts import create_performance_charts
         from visualization.learning_curves import create_learning_curves
         
         create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
         create_learning_curves(log_dir, os.path.join(log_dir, "plots"))
-        print(f"images saved to {log_dir}/plots")
+        #print(f"images saved to {log_dir}/plots")
 
 if __name__ == "__main__":
     if check_config_files():
