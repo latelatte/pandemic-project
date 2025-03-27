@@ -194,12 +194,12 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         plt.annotate('', xy=(arrow_x_pos, arrow_y_pos), xytext=(arrow_x_pos + (max_x - min_x) * 0.1, arrow_y_pos),
                 arrowprops=dict(arrowstyle='<-', color='red'))
         plt.text(arrow_x_pos + (max_x - min_x) * 0.05, arrow_y_pos - (max_y - min_y) * 0.03, 
-                '最小化', ha='center', color='red')
+                'Minimize', ha='center', color='red')
     else:
         plt.annotate('', xy=(arrow_x_pos + (max_x - min_x) * 0.1, arrow_y_pos), xytext=(arrow_x_pos, arrow_y_pos),
                 arrowprops=dict(arrowstyle='<-', color='green'))
         plt.text(arrow_x_pos + (max_x - min_x) * 0.05, arrow_y_pos - (max_y - min_y) * 0.03, 
-                '最大化', ha='center', color='green')
+                'Maximize', ha='center', color='green')
     
     arrow_x_pos = min_x + (max_x - min_x) * 0.05
     arrow_y_pos = min_y + (max_y - min_y) * 0.05
@@ -208,12 +208,12 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         plt.annotate('', xy=(arrow_x_pos, arrow_y_pos + (max_y - min_y) * 0.1), xytext=(arrow_x_pos, arrow_y_pos),
                 arrowprops=dict(arrowstyle='<-', color='green'))
         plt.text(arrow_x_pos - (max_x - min_x) * 0.03, arrow_y_pos + (max_y - min_y) * 0.05, 
-                '最大化', va='center', rotation=90, color='green')
+                'Maximize', va='center', rotation=90, color='green')
     else:
         plt.annotate('', xy=(arrow_x_pos, arrow_y_pos), xytext=(arrow_x_pos, arrow_y_pos + (max_y - min_y) * 0.1),
                 arrowprops=dict(arrowstyle='<-', color='red'))
         plt.text(arrow_x_pos - (max_x - min_x) * 0.03, arrow_y_pos + (max_y - min_y) * 0.05, 
-                '最小化', va='center', rotation=90, color='red')
+                'Minimize', va='center', rotation=90, color='red')
     
     plt.title(title, fontsize=16)
     plt.xlabel(x_label, fontsize=13)
@@ -230,7 +230,7 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
                             alpha=0.1, color='green', label='_ideal_region')
             
             # 理想的な方向を示す矢印
-            plt.annotate('理想領域', xy=(min_x + (max_x - min_x) * 0.2, max_y - (max_y - min_y) * 0.2),
+            plt.annotate('Desireble', xy=(min_x + (max_x - min_x) * 0.2, max_y - (max_y - min_y) * 0.2),
                         xytext=(min_x + (max_x - min_x) * 0.3, max_y - (max_y - min_y) * 0.3),
                         arrowprops=dict(arrowstyle='->', color='green', alpha=0.5),
                         color='green', alpha=0.7, fontsize=12)
@@ -247,8 +247,8 @@ def create_2d_pareto_analysis(df, output_dir):
     create_2d_pareto_chart(
         df, 
         "Avg Time (ms)", "Win Rate (%)",
-        "Average Response Time (ms) - 小さいほど良い", "Win Rate (%) - 大きいほど良い",
-        "パフォーマンスと処理時間のトレードオフ分析",
+        "Average Response Time (ms) - The smaller the better", "Win Rate (%) - The higher the better",
+        "Performance vs Win Rate Trade-off Analysis",
         "pareto_time_winrate.png",
         output_dir,
         "Memory (MB)"
@@ -258,8 +258,8 @@ def create_2d_pareto_analysis(df, output_dir):
     create_2d_pareto_chart(
         df, 
         "Memory (MB)", "Win Rate (%)",
-        "Memory Usage (MB) - 小さいほど良い", "Win Rate (%) - 大きいほど良い",
-        "パフォーマンスとメモリ使用量のトレードオフ分析",
+        "Memory Usage (MB) - The smaller the better", "Win Rate (%) - The higher the better",
+        "Memory vs Win Rate Trade-off Analysis",
         "pareto_memory_winrate.png",
         output_dir,
         "Avg Time (ms)"
@@ -387,15 +387,15 @@ def create_radar_chart(df, output_dir):
     plt.ylim(0, 1)
     
     # 説明ラベルの追加
-    plt.annotate('勝率が高いほど良い', xy=(0, 0.9), xytext=(0.2, 1.1), 
+    plt.annotate('The higher the win rate, the better', xy=(0, 0.9), xytext=(0.2, 1.1), 
                 textcoords='axes fraction', ha='center',
                 arrowprops=dict(arrowstyle='->', color='blue'))
     
-    plt.annotate('処理時間が少ないほど良い', xy=(2*np.pi/3, 0.9), xytext=(0.8, 1.1), 
+    plt.annotate('The less proccessing time, the better', xy=(2*np.pi/3, 0.9), xytext=(0.8, 1.1), 
                 textcoords='axes fraction', ha='center',
                 arrowprops=dict(arrowstyle='->', color='blue'))
     
-    plt.annotate('メモリ消費が少ないほど良い', xy=(4*np.pi/3, 0.9), xytext=(0.5, 1.2), 
+    plt.annotate('The less memory consumption, the better', xy=(4*np.pi/3, 0.9), xytext=(0.5, 1.2), 
                 textcoords='axes fraction', ha='center',
                 arrowprops=dict(arrowstyle='->', color='blue'))
     
@@ -452,9 +452,9 @@ if __name__ == "__main__":
     # コマンドライン引数の解析
     import argparse
     parser = argparse.ArgumentParser(description='パレート最適性分析ツール')
-    parser.add_argument('--dir', type=str, default=None, help='分析する実験ディレクトリ (デフォルト: 最新)')
+    parser.add_argument('--dir', type=str, default="../logs", help='分析する実験ディレクトリ (デフォルト: 最新)')
     parser.add_argument('--n_latest', type=int, default=5, help='集計する実験数 (デフォルト: 5)')
-    parser.add_argument('--output', type=str, default=None, help='出力ディレクトリ (デフォルト: <実験DIR>/plots)')
+    parser.add_argument('--output', type=str, default="./plots", help='出力ディレクトリ (デフォルト: <実験DIR>/plots)')
     
     args = parser.parse_args()
     results_dir = args.dir if args.dir else find_latest_experiment()

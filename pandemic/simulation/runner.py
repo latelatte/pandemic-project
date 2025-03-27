@@ -85,6 +85,9 @@ class SimulationRunner:
             end_time = time.time()
             print(f"Episode took {end_time - start_time:.2f} seconds")
 
+            # エージェントの進捗を評価
+            self.evaluate_agent_progress(ep)
+
         # 実験サマリーをログに記録
         self.logger.log_experiment_summary(
             self.wins, 
@@ -218,6 +221,29 @@ class SimulationRunner:
         for name, data in resource_summary.items():
             print(f"{name}: Avg Memory: {data['avg_memory_mb']:.2f}MB, " 
                   f"Avg CPU: {data['avg_cpu_percent']:.2f}%")
+
+    def evaluate_agent_progress(self, current_episode):
+        """学習の進捗を評価して記録（定期評価用）"""
+        if current_episode % 10 != 0:  # 10エピソードごとに評価
+            return
+            
+        # 直近の結果から学習曲線データを計算
+        recent_win_rate = self.wins / max(1, (self.wins + self.losses))
+        
+        # TensorBoardに記録
+        self.logger.writer.add_scalar('Evaluation/WinRate', recent_win_rate * 100, current_episode)
+        
+        # エージェント別評価指標
+        metrics_summary = self.metrics.get_summary()
+        for agent_name, data in metrics_summary['agent_performance'].items():
+            # 平均応答時間の推移
+            self.logger.writer.add_scalar(f'Evaluation/{agent_name}/AvgTime', 
+                                         data['avg_time_ms'], current_episode)
+            
+            # 勝利貢献度の推移
+            win_contribution = data['win_contribution'] / max(1, current_episode)
+            self.logger.writer.add_scalar(f'Evaluation/{agent_name}/WinContribution', 
+                                         win_contribution * 100, current_episode)
 
 ### メイン関数例
 if __name__ == "__main__":

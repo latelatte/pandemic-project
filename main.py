@@ -60,10 +60,21 @@ def get_agent_strategies(agent_names):
     
     return strategies
 
-def setup_experiment_dir(base_log_dir):
-    """タイムスタンプ付きの実験ディレクトリを作成"""
+def get_agent_names(agent_strategies):
+    """使用するエージェントの名前を簡潔にまとめる"""
+    # 短い形式にするため、'Agent'を取り除く
+    names = [name.replace('Agent', '') for _, name in agent_strategies]
+    # エージェント名を連結（複数の場合はハイフンで区切る）
+    if len(names) == 1:
+        return names[0]  # 単一エージェントの場合はそのまま
+    else:
+        return "-".join(names)  # 複数エージェントの場合はハイフン区切り
+
+def setup_experiment_dir(base_log_dir, agent_strategies):
+    """使用エージェントの名前とタイムスタンプを含む実験ディレクトリを作成"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    exp_dir = os.path.join(base_log_dir, f"experiment_{timestamp}")
+    agent_name = get_agent_names(agent_strategies)
+    exp_dir = os.path.join(base_log_dir, f"experiment_{agent_name}_{timestamp}")
     os.makedirs(exp_dir, exist_ok=True)
     return exp_dir
 
@@ -123,7 +134,8 @@ def main():
         print(f"乱数シードを {args.seed} に設定")
     
     # 実験ディレクトリのセットアップ
-    log_dir = setup_experiment_dir(args.log_dir)
+    strategies = get_agent_strategies(args.agents)
+    log_dir = setup_experiment_dir(args.log_dir, strategies)
     print(f"実験結果は {log_dir} に保存されます")
     
     # TensorBoardの初期化
@@ -131,7 +143,6 @@ def main():
     os.makedirs(tb_dir, exist_ok=True)
     
     # エージェント戦略の準備
-    strategies = get_agent_strategies(args.agents)
     if not strategies:
         print("エラー: 有効なエージェントが指定されていません")
         return
@@ -167,7 +178,10 @@ def main():
     if args.visualize:
         print("結果を可視化しています...")
         from visualization.performance_charts import create_performance_charts
+        from visualization.learning_curves import create_learning_curves  # 新しいインポート
+        
         create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
+        create_learning_curves(log_dir, os.path.join(log_dir, "plots"))  # 学習曲線を追加
         print(f"可視化結果を {log_dir}/plots に保存しました")
 
 if __name__ == "__main__":

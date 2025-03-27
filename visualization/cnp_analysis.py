@@ -161,12 +161,12 @@ def create_cnp_chart(df, output_dir):
     
     plt.title("Cost-Normalized Performance (CNP)", fontsize=16)
     plt.xlabel("Agent", fontsize=13)
-    plt.ylabel("CNP Score (勝率 / (メモリGB × 時間))", fontsize=13)
+    plt.ylabel("CNP Score (win rate / (Memory × Time))", fontsize=13)
     plt.grid(True, linestyle='--', alpha=0.7)
     
     # CNPの説明を図に追加
     plt.figtext(0.1, 0.01, 
-               "CNP: コスト正規化性能指標 - 同じリソース消費量でどれだけ勝率が高いかを示す効率性指標", 
+               "CNP: Cost-normalised performance indicators - efficiency indicators that show how much higher the win rate is for the same resource consumption.", 
                wrap=True, fontsize=10, style='italic')
     
     plt.tight_layout(rect=[0, 0.05, 1, 1])  # テキスト用に下部スペース確保
@@ -385,9 +385,9 @@ if __name__ == "__main__":
     # コマンドライン引数の解析
     import argparse
     parser = argparse.ArgumentParser(description='コスト正規化性能(CNP)分析ツール')
-    parser.add_argument('--dir', type=str, default=None, help='分析する実験ディレクトリ (デフォルト: 最新)')
+    parser.add_argument('--dir', type=str, default="../logs", help='分析する実験ディレクトリ (デフォルト: 最新)')
     parser.add_argument('--n_latest', type=int, default=5, help='集計する実験数 (デフォルト: 5)')
-    parser.add_argument('--output', type=str, default=None, help='出力ディレクトリ (デフォルト: <実験DIR>/plots)')
+    parser.add_argument('--output', type=str, default="./plots", help='出力ディレクトリ (デフォルト: <実験DIR>/plots)')
     
     args = parser.parse_args()
     results_dir = args.dir if args.dir else find_latest_experiment()
