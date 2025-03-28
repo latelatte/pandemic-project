@@ -166,6 +166,7 @@ logs/
 experiment_*/
 *.log
 results/
+evaluations/
 
 # モデル保存ファイル
 *.pt
