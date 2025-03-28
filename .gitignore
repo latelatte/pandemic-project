@@ -171,7 +171,8 @@ evaluations/
 # モデル保存ファイル
 *.pt
 *.pth
-saved_models/
+*.pkl
+agent_state/
 
 # MacOS固有ファイル
 .DS_Store
