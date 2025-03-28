@@ -22,21 +22,21 @@ def parse_args():
     """for command line arguments"""
     parser = argparse.ArgumentParser(description='pandemic simulation')
     
-    parser.add_argument('--episodes', type=int, default=1,
-                       help='number of episodes to run (default: 10)')
-    parser.add_argument('--log-dir', type=str, default='./logs',
+    parser.add_argument('-e', '--episodes', type=int, default=1000,
+                       help='number of episodes to run (default: 100)')
+    parser.add_argument('-l', '--log-dir', type=str, default='./logs',
                        help='directory to save logs (default: ./logs)')
-    parser.add_argument('--agents', nargs='+', 
+    parser.add_argument('-a', '--agents', nargs='+', 
                        default=['random', 'mcts', 'ea', 'marl'],
                        choices=['random', 'mcts', 'ea', 'marl'],
                        help='list of agent strategies to use (default: all)')
-    parser.add_argument('--seed', type=int, default=None,
+    parser.add_argument('-s', '--seed', type=int, default=None,
                        help='random seed for reproducibility (default: None)')
-    parser.add_argument('--visualize', action='store_true',
+    parser.add_argument('-v', '--visualize', action='store_true',
                        help='make plots', default=True)
-    parser.add_argument('--players', type=int, default=4,
+    parser.add_argument('-p', '--players', type=int, default=4,
                        help='number of players (default: 4)')
-    parser.add_argument('--difficulty', type=str, default='normal',
+    parser.add_argument('-d', '--difficulty', type=str, default='easy',
                        choices=['easy', 'normal', 'hard'],
                        help='game difficulty (default: normal)')
     
