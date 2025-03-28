@@ -172,7 +172,7 @@ evaluations/
 *.pt
 *.pth
 *.pkl
-agent_state/
+agents_state/
 
 # MacOS固有ファイル
 .DS_Store
