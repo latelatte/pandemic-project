@@ -1,0 +1,28 @@
+{
+  "difficulty_levels": {
+    "easy": {
+      "epidemic_cards": 4,
+      "player_cards_initial": 4,
+      "player_cards_per_turn": 2,
+      "max_infection_level": 3,
+      "outbreak_limit": 8
+    },
+    "normal": {
+      "epidemic_cards": 5,
+      "player_cards_initial": 3,
+      "player_cards_per_turn": 2,
+      "max_infection_level": 3,
+      "outbreak_limit": 8
+    },
+    "hard": {
+      "epidemic_cards": 6,
+      "player_cards_initial": 3,
+      "player_cards_per_turn": 2,
+      "max_infection_level": 3,
+      "outbreak_limit": 6
+    }
+  },
+  "actions_per_turn": 4,
+  "cards_needed_for_cure": 5,
+  "default_difficulty": "normal"
+}

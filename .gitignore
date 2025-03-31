@@ -189,7 +189,7 @@ temp/
 *.json
 *.csv
 # 必要なJSONファイルは!で除外指定する
-!config/*.json
+!/pandemic/config/*.json
 
 # 可視化出力
 *.png

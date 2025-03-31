@@ -1,0 +1,17 @@
+{
+  "diseases": [
+    {"color": "Blue", "region": "North America"},
+    {"color": "Yellow", "region": "Asia"},
+    {"color": "Black", "region": "Europe"},
+    {"color": "Red", "region": "Other"}
+  ],
+  "infection_rates": [2, 2, 2, 3, 3, 4, 4],
+  "initial_infection": {
+    "3_cubes_cities": 3,
+    "2_cubes_cities": 3,
+    "1_cube_cities": 3
+  },
+  "max_infection_level": 3,
+  "outbreak_limit": 8
+}
+
