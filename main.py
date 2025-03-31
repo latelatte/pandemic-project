@@ -22,7 +22,7 @@ def parse_args():
     """for command line arguments"""
     parser = argparse.ArgumentParser(description='pandemic simulation')
     
-    parser.add_argument('-e', '--episodes', type=int, default=50,
+    parser.add_argument('-e', '--episodes', type=int, default=20,
                        help='number of episodes to run (default: 100)')
     parser.add_argument('-l', '--log-dir', type=str, default='./logs',
                        help='directory to save logs (default: ./logs)')

@@ -1,3 +1,4 @@
+import random
 class Player:
     """
     class for player
@@ -95,6 +96,31 @@ class Player:
             # アクション実行（simulation内の対応するメソッドを呼び出す）
             self._execute_action(action)
             remaining_actions -= 1
+
+        # アクション終了後、手札上限チェック
+        max_hand_size = 7
+        while len(self.hand) > max_hand_size:
+            print(f"{self.name} must discard down to {max_hand_size} cards")
+            # エージェントに破棄カードを選択させる
+            discard_action = self.strategy(self)
+            if discard_action and discard_action.get("type") == "discard":
+                card = discard_action.get("card")
+                if card in self.hand:
+                    self.hand.remove(card)
+                    self.simulation.player_discard_pile.append(card)
+                    print(f"{self.name} discarded {card}")
+                else:
+                    # 指定されたカードが手札にない場合、ランダムに1枚破棄
+                    card = random.choice(self.hand)
+                    self.hand.remove(card)
+                    self.simulation.player_discard_pile.append(card)
+                    print(f"{self.name} randomly discarded {card}")
+            else:
+                # 破棄アクションが返されなかった場合、ランダムに1枚破棄
+                card = random.choice(self.hand)
+                self.hand.remove(card)
+                self.simulation.player_discard_pile.append(card)
+                print(f"{self.name} randomly discarded {card}")
 
     def _execute_action(self, action):
         """

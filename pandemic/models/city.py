@@ -20,18 +20,21 @@ class City:
         if self not in other_city.neighbours:
             other_city.neighbours.append(self)
 
-    def increase_infection(self, amount, color="Blue"):
-        """increase infection level by amount"""
+    def increase_infection(self, amount=1, color="Blue"):
         old_level = self.infection_level
         self.infection_level += amount
-        
-        # track disease cubes for each color
-        if color not in self.disease_cubes:
-            self.disease_cubes[color] = 0
-        self.disease_cubes[color] += amount
-        
         print(f"{self.name}: infection level {old_level} -> {self.infection_level}")
-        return self.infection_level
+        
+        # アウトブレイクチェックを行う前に属性の存在を確認
+        if hasattr(self, 'simulation') and self.simulation:
+            max_level = getattr(self.simulation, 'max_infection_level', 3)  # デフォルト値として3を使用
+            
+            if self.infection_level > max_level:
+                # アウトブレイク処理
+                if not hasattr(self, 'outbreak_marker') or not self.outbreak_marker:
+                    self.outbreak_marker = True
+                    if hasattr(self.simulation, 'handle_outbreak'):
+                        self.simulation.handle_outbreak(self, color)
 
     def treat_infection(self, n=1):
         """

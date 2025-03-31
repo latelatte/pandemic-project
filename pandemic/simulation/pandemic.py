@@ -20,6 +20,32 @@ class PandemicSimulation:
         
         difficulty_settings = game_config["difficulty_levels"][difficulty]
         
+        self.max_infection_level = difficulty_settings["max_infection_level"]
+        self.outbreak_limit = difficulty_settings["outbreak_limit"]
+        self.outbreak_count = 0
+        self.turn_count = 0
+        self.game_over = False
+        self.discovered_cures = []
+        self.infection_rates = [2, 2, 2, 3, 3, 4, 4] 
+        self.infection_rate_index = 0
+        
+        # 疾病の初期化
+        self.diseases = []
+        disease_colors = ["Blue", "Red", "Yellow", "Black"]
+        for color in disease_colors[:3]:
+            self.diseases.append({
+                "color": color,
+                "cured": False,
+                "eradicated": False
+            })
+
+        self.player_discard_pile = []
+        self.infection_discard_pile = []
+        
+        self.infection_rate_index = difficulty_settings.get("initial_infection_rate_index", 0)
+
+        self.actions_per_turn = game_config.get("actions_per_turn", 4)  # デフォルト値として4を設定
+
         self.cities = self._create_cities(cities_config)
         for city in self.cities:
             city.simulation = self
@@ -78,32 +104,6 @@ class PandemicSimulation:
 
         self.initial_infection()
 
-        self.max_infection_level = difficulty_settings["max_infection_level"]
-        self.outbreak_limit = difficulty_settings["outbreak_limit"]
-        self.outbreak_count = 0
-        self.turn_count = 0
-        self.game_over = False
-        self.discovered_cures = []
-        self.infection_rates = [2, 2, 2, 3, 3, 4, 4] 
-        self.infection_rate_index = 0
-        
-        # 疾病の初期化
-        self.diseases = []
-        disease_colors = ["Blue", "Red", "Yellow", "Black"]
-        for color in disease_colors[:3]:
-            self.diseases.append({
-                "color": color,
-                "cured": False,
-                "eradicated": False
-            })
-
-        self.player_discard_pile = []
-        self.infection_discard_pile = []
-        
-        self.infection_rate_index = difficulty_settings.get("initial_infection_rate_index", 0)
-
-        self.actions_per_turn = game_config.get("actions_per_turn", 4)  # デフォルト値として4を設定
-
     def _load_config(self, config_dir, filename):
         """load configuration from JSON file and merge with defaults"""
         filepath = os.path.join(config_dir, filename)
@@ -160,9 +160,9 @@ class PandemicSimulation:
         
         # 都市数が20未満の場合、multiplierを大きくする（都市数が少ないことを補償）
         if len(self.cities) < 20:
-            multiplier = 12  # 大幅に増加
+            multiplier = 6  # 大幅に増加
         else:
-            multiplier = 6
+            multiplier = 4
         
         citycards = []
         for city in self.cities:
@@ -244,6 +244,11 @@ class PandemicSimulation:
 
                 self.draw_player_cards(p)
                 self.infection_phase()
+                
+                # ターン終了時にアウトブレイクマーカーをリセット
+                for city in self.cities:
+                    if hasattr(city, 'outbreak_marker'):
+                        city.outbreak_marker = False
                 
                 print(f"End of turn {self.turn_count} - Player deck has {len(self.player_deck)} cards remaining")
 
