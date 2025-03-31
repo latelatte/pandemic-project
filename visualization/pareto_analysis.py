@@ -369,6 +369,461 @@ def create_radar_chart(df, output_dir):
     plt.savefig(os.path.join(output_dir, "radar_comparison.png"), dpi=300)
     plt.close()
 
+def create_gpu_pareto_chart(df, output_dir):
+    """
+    Create Pareto charts with GPU metrics
+    
+    Args:
+        df: DataFrame containing agent performance data
+        output_dir: Directory to save output visualizations
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. GPU Memory vs Win Rate
+    plt.figure(figsize=(12, 8))
+    
+    sns.scatterplot(
+        data=df,
+        x="GPU Memory (MB)",
+        y="Win Rate (%)",
+        hue="Agent",
+        size="Avg Time (ms)",
+        sizes=(100, 500),
+        alpha=0.7
+    )
+    
+    plt.title("GPU Memory vs Win Rate Trade-off", fontsize=16)
+    plt.xlabel("GPU Memory Consumption (MB)", fontsize=12)
+    plt.ylabel("Win Rate (%)", fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Add annotations for each point
+    for i, row in df.iterrows():
+        plt.annotate(
+            row['Agent'], 
+            (row['GPU Memory (MB)'], row['Win Rate (%)']),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=10
+        )
+    
+    plt.savefig(os.path.join(output_dir, "gpu_memory_vs_winrate.png"), dpi=300)
+    plt.close()
+    
+    # 2. GPU Utilization vs Win Rate
+    plt.figure(figsize=(12, 8))
+    
+    sns.scatterplot(
+        data=df,
+        x="GPU Utilization (%)",
+        y="Win Rate (%)",
+        hue="Agent",
+        size="Avg Time (ms)",
+        sizes=(100, 500),
+        alpha=0.7
+    )
+    
+    plt.title("GPU Utilization vs Win Rate Trade-off", fontsize=16)
+    plt.xlabel("GPU Utilization (%)", fontsize=12)
+    plt.ylabel("Win Rate (%)", fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Add annotations for each point
+    for i, row in df.iterrows():
+        plt.annotate(
+            row['Agent'], 
+            (row['GPU Utilization (%)'], row['Win Rate (%)']),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=10
+        )
+    
+    plt.savefig(os.path.join(output_dir, "gpu_utilization_vs_winrate.png"), dpi=300)
+    plt.close()
+    
+    # 3. 3D visualization with CPU Memory, GPU Memory, and Win Rate
+    try:
+        from mpl_toolkits.mplot3d import Axes3D
+        
+        fig = plt.figure(figsize=(14, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        scatter = ax.scatter(
+            df['Memory (MB)'],
+            df['GPU Memory (MB)'],
+            df['Win Rate (%)'],
+            c=df['GPU Utilization (%)'],
+            cmap='viridis',
+            s=df['Avg Time (ms)'] / 2,
+            alpha=0.7
+        )
+        
+        ax.set_xlabel('CPU Memory (MB)', fontsize=12)
+        ax.set_ylabel('GPU Memory (MB)', fontsize=12)
+        ax.set_zlabel('Win Rate (%)', fontsize=12)
+        
+        # Add colorbar
+        cbar = fig.colorbar(scatter, ax=ax, pad=0.1)
+        cbar.set_label('GPU Utilization (%)', fontsize=12)
+        
+        # Add annotations
+        for i, row in df.iterrows():
+            ax.text(
+                row['Memory (MB)'],
+                row['GPU Memory (MB)'],
+                row['Win Rate (%)'],
+                row['Agent'],
+                fontsize=9
+            )
+        
+        plt.title("3D Resource Usage vs Performance", fontsize=16)
+        plt.savefig(os.path.join(output_dir, "3d_gpu_cpu_memory_winrate.png"), dpi=300)
+        plt.close()
+    except Exception as e:
+        print(f"Error creating 3D plot: {e}")
+
+
+def create_gpu_enhanced_radar_chart(df, output_dir):
+    """
+    Create radar charts including GPU metrics
+    
+    Args:
+        df: DataFrame containing agent performance data
+        output_dir: Directory to save output visualizations
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Normalize metrics for radar chart
+    df_norm = df.copy()
+    
+    # Metrics to normalize
+    metrics = [
+        'Win Rate (%)', 
+        'Avg Time (ms)', 
+        'Memory (MB)', 
+        'GPU Memory (MB)', 
+        'GPU Utilization (%)'
+    ]
+    
+    # Determine which metrics should be maximized vs minimized
+    maximize_metrics = ['Win Rate (%)']
+    minimize_metrics = ['Avg Time (ms)', 'Memory (MB)', 'GPU Memory (MB)', 'GPU Utilization (%)']
+    
+    # Normalize each metric to [0, 1] range
+    for col in metrics:
+        max_val = df[col].max()
+        min_val = df[col].min()
+        range_val = max_val - min_val
+        
+        if range_val > 0:
+            if col in maximize_metrics:
+                # For metrics we want to maximize, higher values should be closer to 1
+                df_norm[col] = (df[col] - min_val) / range_val
+            else:
+                # For metrics we want to minimize, lower values should be closer to 1
+                df_norm[col] = 1 - ((df[col] - min_val) / range_val)
+        else:
+            df_norm[col] = 0.5  # Default if no variation
+    
+    # Create radar chart
+    plt.figure(figsize=(12, 10))
+    
+    # Categories for radar chart
+    categories = [
+        'Win Rate', 
+        'Time Efficiency', 
+        'Memory Efficiency', 
+        'GPU Memory Efficiency', 
+        'GPU Utilization Efficiency'
+    ]
+    
+    # Number of categories
+    N = len(categories)
+    
+    # Angles for each category (in radians)
+    angles = [n / float(N) * 2 * np.pi for n in range(N)]
+    angles += angles[:1]  # Close the loop
+    
+    # Create subplot with polar projection
+    ax = plt.subplot(111, polar=True)
+    
+    # Draw one line per agent with different colors
+    for i, agent in enumerate(df['Agent'].unique()):
+        agent_data = df_norm[df_norm['Agent'] == agent]
+        
+        # Values for each category
+        values = [
+            agent_data['Win Rate (%)'].values[0],
+            agent_data['Avg Time (ms)'].values[0],
+            agent_data['Memory (MB)'].values[0],
+            agent_data['GPU Memory (MB)'].values[0],
+            agent_data['GPU Utilization (%)'].values[0]
+        ]
+        
+        # Close the loop
+        values += values[:1]
+        
+        # Plot the agent's data
+        ax.plot(angles, values, linewidth=2, linestyle='solid', label=agent)
+        ax.fill(angles, values, alpha=0.1)
+    
+    # Set category labels
+    plt.xticks(angles[:-1], categories, fontsize=12)
+    
+    # Add axis lines
+    ax.set_rlabel_position(0)
+    
+    # Set y-ticks
+    plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=10)
+    plt.ylim(0, 1)
+    
+    # Add a legend
+    plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=12)
+    
+    # Add a title
+    plt.title('GPU-Enhanced Agent Performance Comparison', size=16)
+    
+    # Add explanatory annotations
+    plt.annotate('Higher is better for all metrics', xy=(0, 0), xytext=(-0.2, -0.15), 
+                textcoords='axes fraction', ha='center', fontsize=10)
+    
+    # Save the figure
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "gpu_enhanced_radar_chart.png"), dpi=300)
+    plt.close()
+
+
+def create_cnp_comparison_chart(df, output_dir):
+    """
+    Create bar charts comparing different CNP calculation methods
+    
+    Args:
+        df: DataFrame containing agent performance and CNP data
+        output_dir: Directory to save output visualizations
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create grouped bar chart for CNP comparison
+    plt.figure(figsize=(14, 8))
+    
+    # Set width of bars
+    bar_width = 0.25
+    index = np.arange(len(df['Agent']))
+    
+    # Create bars
+    plt.bar(index, df['Standard CNP'], bar_width, label='Standard CNP', color='skyblue')
+    plt.bar(index + bar_width, df['CPU-only CNP'], bar_width, label='CPU-only CNP', color='lightgreen')
+    plt.bar(index + 2 * bar_width, df['GPU-focused CNP'], bar_width, label='GPU-focused CNP', color='salmon')
+    
+    # Add labels and title
+    plt.xlabel('Agent', fontsize=14)
+    plt.ylabel('CNP Value', fontsize=14)
+    plt.title('Comparison of CNP Calculation Methods', fontsize=16)
+    plt.xticks(index + bar_width, df['Agent'])
+    plt.legend()
+    
+    # Add value labels on top of bars
+    for i, value in enumerate(df['Standard CNP']):
+        plt.text(i, value + 0.1, f"{value:.2f}", ha='center', va='bottom', fontsize=9)
+    
+    for i, value in enumerate(df['CPU-only CNP']):
+        plt.text(i + bar_width, value + 0.1, f"{value:.2f}", ha='center', va='bottom', fontsize=9)
+    
+    for i, value in enumerate(df['GPU-focused CNP']):
+        plt.text(i + 2 * bar_width, value + 0.1, f"{value:.2f}", ha='center', va='bottom', fontsize=9)
+    
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "cnp_comparison.png"), dpi=300)
+    plt.close()
+    
+    # Create pie charts showing resource distribution for each agent
+    for i, row in df.iterrows():
+        agent = row['Agent']
+        
+        plt.figure(figsize=(8, 8))
+        
+        # Data for pie chart
+        resources = ['CPU Resources', 'GPU Resources']
+        sizes = [row['CPU Resource %'], row['GPU Resource %']]
+        colors = ['skyblue', 'lightcoral']
+        explode = (0, 0.1)  # Explode the GPU slice for emphasis
+        
+        # Create pie chart
+        plt.pie(sizes, explode=explode, labels=resources, colors=colors,
+                autopct='%1.1f%%', shadow=True, startangle=90)
+        
+        # Add a title
+        plt.title(f'Resource Distribution for {agent}', size=16)
+        
+        # Save the figure
+        plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
+        plt.savefig(os.path.join(output_dir, f"{agent}_resource_distribution.png"), dpi=300)
+        plt.close()
+
+
+def create_gpu_impact_visualization(df, output_dir):
+    """
+    Create visualizations showing the impact of GPU usage on performance
+    
+    Args:
+        df: DataFrame with performance and resource data
+        output_dir: Directory to save visualizations
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. Scatter plot of GPU utilization vs performance
+    plt.figure(figsize=(12, 8))
+    
+    # Create a color gradient based on GPU memory
+    scatter = plt.scatter(
+        df['GPU Utilization (%)'], 
+        df['Win Rate (%)'],
+        c=df['GPU Memory (MB)'],
+        s=df['Avg Time (ms)'] / 2,
+        cmap='viridis',
+        alpha=0.8
+    )
+    
+    # Add a colorbar
+    cbar = plt.colorbar(scatter)
+    cbar.set_label('GPU Memory (MB)', fontsize=12)
+    
+    # Add labels and title
+    plt.xlabel('GPU Utilization (%)', fontsize=14)
+    plt.ylabel('Win Rate (%)', fontsize=14)
+    plt.title('Impact of GPU Usage on Performance', fontsize=16)
+    
+    # Add annotations for each point
+    for i, row in df.iterrows():
+        plt.annotate(
+            row['Agent'], 
+            (row['GPU Utilization (%)'], row['Win Rate (%)']),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=11
+        )
+    
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "gpu_impact_performance.png"), dpi=300)
+    plt.close()
+    
+    # 2. Bar chart of GPU Memory vs Win Rate with CPU Memory stacked
+    plt.figure(figsize=(14, 8))
+    
+    # Sort by win rate
+    df_sorted = df.sort_values('Win Rate (%)', ascending=False)
+    
+    # Create positions for bars
+    x = np.arange(len(df_sorted))
+    
+    # Create stacked bars for CPU and GPU memory
+    plt.bar(x, df_sorted['Memory (MB)'], label='CPU Memory (MB)', color='skyblue')
+    plt.bar(x, df_sorted['GPU Memory (MB)'], bottom=df_sorted['Memory (MB)'], 
+            label='GPU Memory (MB)', color='orange')
+    
+    # Plot win rate line on secondary y-axis
+    ax2 = plt.twinx()
+    ax2.plot(x, df_sorted['Win Rate (%)'], 'ro-', linewidth=2, label='Win Rate (%)')
+    
+    # Set labels and title
+    plt.xlabel('Agent', fontsize=14)
+    plt.ylabel('Memory Usage (MB)', fontsize=14)
+    ax2.set_ylabel('Win Rate (%)', fontsize=14, color='r')
+    plt.title('Memory Usage Distribution vs. Performance', fontsize=16)
+    
+    # Set x-tick labels to agent names
+    plt.xticks(x, df_sorted['Agent'])
+    
+    # Add legends
+    plt.legend(loc='upper left')
+    ax2.legend(loc='upper right')
+    
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "memory_distribution_vs_performance.png"), dpi=300)
+    plt.close()
+    
+    # 3. Heatmap of resource usage patterns
+    plt.figure(figsize=(12, 10))
+    
+    # Create a normalized dataset for the heatmap
+    heatmap_data = df[['Agent', 'Win Rate (%)', 'Avg Time (ms)', 'Memory (MB)', 
+                      'GPU Memory (MB)', 'GPU Utilization (%)']].set_index('Agent')
+    
+    # Normalize each column
+    for col in heatmap_data.columns:
+        min_val = heatmap_data[col].min()
+        max_val = heatmap_data[col].max()
+        if max_val > min_val:
+            heatmap_data[col] = (heatmap_data[col] - min_val) / (max_val - min_val)
+    
+    # Create heatmap
+    sns.heatmap(heatmap_data, annot=True, cmap="YlGnBu", linewidths=.5, fmt=".2f")
+    
+    plt.title('Resource Usage Patterns by Agent', fontsize=16)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "resource_usage_heatmap.png"), dpi=300)
+    plt.close()
+
+
+# Example usage of these visualization functions
+def create_all_gpu_visualizations(data, output_dir="./gpu_visualizations"):
+    """
+    Create all GPU-enhanced visualizations
+    
+    Args:
+        data: Dictionary with agent performance data
+        output_dir: Directory to save visualizations
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create DataFrame for visualization
+    agents = []
+    for agent_name, metrics in data.items():
+        # Get the latest win rate and resource metrics
+        win_rate = metrics.get("fixed_resource_win_rate", 0)
+        avg_time_ms = metrics.get("agent_performance", {}).get(agent_name, {}).get("avg_time_ms", 0)
+        memory_mb = metrics.get("resource_usage", {}).get(agent_name, {}).get("avg_memory_mb", 0)
+        gpu_memory_mb = metrics.get("resource_usage", {}).get(agent_name, {}).get("avg_gpu_memory_mb", 0)
+        gpu_percent = metrics.get("resource_usage", {}).get(agent_name, {}).get("avg_gpu_percent", 0)
+        
+        # Get CNP calculations
+        standard_cnp = metrics.get("fixed_resource_cnp", 0)
+        cpu_only_cnp = metrics.get("fixed_resource_cpu_only_cnp", 0)
+        gpu_focused_cnp = metrics.get("fixed_resource_gpu_focused_cnp", 0)
+        
+        # Get resource distribution
+        resource_dist = metrics.get("fixed_resource_resource_distribution", {})
+        cpu_percent = resource_dist.get("cpu_percent", 50)
+        gpu_percent = resource_dist.get("gpu_percent", 50)
+        
+        agents.append({
+            "Agent": agent_name,
+            "Win Rate (%)": win_rate,
+            "Avg Time (ms)": avg_time_ms,
+            "Memory (MB)": memory_mb,
+            "GPU Memory (MB)": gpu_memory_mb,
+            "GPU Utilization (%)": gpu_percent,
+            "Standard CNP": standard_cnp,
+            "CPU-only CNP": cpu_only_cnp,
+            "GPU-focused CNP": gpu_focused_cnp,
+            "CPU Resource %": cpu_percent,
+            "GPU Resource %": gpu_percent
+        })
+    
+    df = pd.DataFrame(agents)
+    
+    # Create visualizations
+    create_gpu_pareto_chart(df, output_dir)
+    create_gpu_enhanced_radar_chart(df, output_dir)
+    create_cnp_comparison_chart(df, output_dir)
+    create_gpu_impact_visualization(df, output_dir)
+    
+    print(f"All GPU-enhanced visualizations created in: {output_dir}")
+    return df
+
 def run_pareto_analysis(results_dir, output_dir=None, n_latest=5):
     if output_dir is None:
         output_dir = os.path.join(os.path.dirname(results_dir) if os.path.isdir(results_dir) else results_dir, "plots")
@@ -412,7 +867,7 @@ if __name__ == "__main__":
     
     import argparse
     parser = argparse.ArgumentParser(description='pareto analysis')
-    parser.add_argument('--dir', type=str, default="../logs", help='target experiment directory (デフォルト: ../logs)')
+    parser.add_argument('--dir', type=str, default="./logs", help='target experiment directory (デフォルト: ../logs)')
     parser.add_argument('--n_latest', type=int, default=5, help='number of latest experiments to analyze (デフォルト: 5)')
     parser.add_argument('--output', type=str, default="./plots", help='output directory for plots (デフォルト: ./plots)')
     
