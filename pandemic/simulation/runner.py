@@ -6,6 +6,7 @@ from pandemic.simulation.pandemic import PandemicSimulation
 from pandemic.utils.metrics_utils import MetricsCollector
 from pandemic.utils.logging_utils import SimulationLogger
 from pandemic.utils.resource_utils import ResourceMonitor
+from visualization.convergence_detector import ConvergenceDetector
 
 class SimulationRunner:
     """class to run the simulation and collect metrics"""
@@ -153,6 +154,11 @@ class SimulationRunner:
             print(f"Error saving agent states {e}")
         
         self.print_summary()
+        
+        self.convergence_detector = ConvergenceDetector()
+        if self.convergence_detector.update(win, ep):
+            print(f"Convergence detected at episode {ep} after {self.convergence_detector.convergence_time:.2f} seconds") 
+        
         return metrics_data
 
     def make_timed_strategy(self, orig_strategy, agent_name):
