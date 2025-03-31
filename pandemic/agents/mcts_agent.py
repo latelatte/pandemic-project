@@ -295,7 +295,6 @@ class MCTSAgent(BaseAgent):
             
         next_state = node.apply_action(node.state, action)
         
-        # 再帰的にシミュレーション続行
         node = MCTSNode(next_state, exploration_weight=self.exploration_weight)
         return self._simulate(node, depth + 1)
     
@@ -433,6 +432,47 @@ class MCTSAgent(BaseAgent):
         except Exception as e:
             print(f"Error loading MCTS state: {e}")
             return False
+
+    def _score_action(self, action, individual, player, simulation):
+        action_type = action.get("type")
+        score = 0.0
+
+        if action_type == "discover_cure":
+            return 10.0
+        
+        if action_type == "move":
+            target_city = action.get("target_city")
+            if target_city:
+                color_counts = {}
+                for card in player.hand:
+                    if hasattr(card, 'color') and card.color != "INF":
+                        if card.color not in color_counts:
+                            color_counts[card.color] = 0
+                        color_counts[card.color] += 1
+                
+                most_common_color = None
+                max_count = 0
+                for color, count in color_counts.items():
+                    if count > max_count:
+                        max_count = count
+                        most_common_color = color
+
+                research_stations = [c for c in simulation.cities if c.has_research_station]
+                if research_stations and player.city not in research_stations:
+                    for rs in research_stations:
+                        if target_city == rs:
+                            score += 3.0
+                            break
+        
+        elif action_type == "treat":
+            score += 1.5 
+        
+        elif action_type == "build":
+            research_stations = [c for c in simulation.cities if c.has_research_station]
+            if len(research_stations) < 3: 
+                score += 2.5
+        
+        return score
 
 _global_mcts_agent = None
 

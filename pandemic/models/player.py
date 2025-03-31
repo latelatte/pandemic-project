@@ -2,11 +2,9 @@ class Player:
     """
     class for player
     """
-    # クラス変数としてカウンタを追加
     _id_counter = 0
     
     def __init__(self, name, strategy_func, strategy_name, role=None):
-        # 一意のIDを割り当て
         self.id = Player._id_counter
         Player._id_counter += 1
         
@@ -35,36 +33,112 @@ class Player:
         if card in self.hand:
             self.hand.remove(card)
 
-    def strategy(self):
+    def strategy(self, player=None):
         """
         actual strategy function
+        Returns the action to perform
         """
-        self.strategy_func(self)
+        if player is None:
+            player = self
+        return self.strategy_func(player) 
 
     def perform_turn(self):
-        actions_remaining = 4
+        remaining_actions = self.simulation.actions_per_turn
+        print(f"--- {self.name}'s turn starting with {len(self.hand)} cards in hand ---")
         
-        while actions_remaining > 0:
-            action = self.strategy_func(self) if self.strategy_func else None
+        used_cards = set()  # ターン中に使用したカードを追跡
+        
+        while remaining_actions > 0:
+            # 更新された手札情報でアクションを決定
+            available_hand = [card for card in self.hand if id(card) not in [id(c) for c in used_cards]]
+            
+            # 一時的に手札を更新して意思決定
+            actual_hand = self.hand.copy()
+            self.hand = available_hand
+            
+            action = self.strategy(self)
+            
+            # 元の手札に戻す
+            self.hand = actual_hand
             
             if not action:
-                print(f"{self.name} has skipped.")
-                actions_remaining -= 1
-                continue
+                break
+                
+            # アクションの実行とカードの追跡
+            if action["type"] == "move" and action.get("method") in ["direct_flight", "charter_flight"]:
+                card = action.get("card")
+                if card:
+                    if card in self.hand:  # カードが実際に手札にあるか確認
+                        used_cards.add(card)
+                        self.hand.remove(card)
+                        self.simulation.player_discard_pile.append(card)
+                        print(f"{self.name} discarded {card} for {action.get('method')}")
+                    else:
+                        print(f"ERROR: Card {card} not in hand!")
+                        action["method"] = "standard"  # カードがなければ標準移動に変更
             
-            success = False
+            # 他のカードを使用するアクション（治療薬発見など）も同様に処理
+            elif action["type"] == "discover_cure":
+                cards = action.get("cards", [])
+                valid_cards = [c for c in cards if c in self.hand]
+                if len(valid_cards) >= 4:  # 最低4枚必要
+                    for card in valid_cards[:5]:  # 最大5枚使用
+                        if card in self.hand:
+                            used_cards.add(card)
+                            self.hand.remove(card)
+                            self.simulation.player_discard_pile.append(card)
+                    print(f"{self.name} used {len(valid_cards)} cards for cure discovery")
+                else:
+                    print(f"ERROR: Not enough valid cards for cure discovery")
+                    action = {"type": "pass"}  # 代わりにパスに変更
             
-            if action.get("type") == "move":
-                target = action.get("target")
-                if target:
-                    success = self.move_to(target)
+            # アクション実行（simulation内の対応するメソッドを呼び出す）
+            self._execute_action(action)
+            remaining_actions -= 1
+
+    def _execute_action(self, action):
+        """
+        アクションを適切なメソッド呼び出しに委譲する
+        """
+        action_type = action.get("type")
+        
+        if action_type == "move":
+            target_city = action.get("target_city")
+            if target_city:
+                self.move_to(target_city)
+        
+        elif action_type == "treat":
+            city = action.get("city", self.city)
+            color = action.get("color", "Blue")
+            # 既存のメソッドに委譲
+            self.simulation.treat_disease(self, city, color)
+        
+        elif action_type == "build":
+            # カードが指定されていれば使用
+            card = action.get("card")
+            self.build_research_station(card)
+        
+        elif action_type == "discover_cure":
+            color = action.get("color")
+            # 既に手札からカードは削除済み
+            self.simulation.discover_cure(self, color)
+        
+        elif action_type == "share_knowledge":
+            direction = action.get("direction")
+            target_player = action.get("target_player")
+            card = action.get("card")
             
-            elif action.get("type") == "treat":
-                target = action.get("target") or self.city
-                if target and target.infection_level > 0:
-                    success = self.treat_disease(target)
-            
-            actions_remaining -= 1
+            # 知識共有の実装
+            if card and target_player:
+                if direction == "give":
+                    target_player.hand.append(card)
+                    print(f"{self.name} gave {card} to {target_player.name}")
+                else:  # take
+                    self.hand.append(card)
+                    print(f"{self.name} took {card} from {target_player.name}")
+        
+        elif action_type == "pass":
+            print(f"{self.name} passes their action")
 
     def available_actions(self):
         actions = []
@@ -116,21 +190,45 @@ class Player:
         print(f"{self.name} treated {city.name}")
         return True
 
-    def build_research_station(self):
-        if self.use_ability("build_research_station"):
+    def build_research_station(self, card=None):
+        """
+        Build a research station in the current city
+        """
+        # すでに研究所がある場合は何もしない
+        if self.city.has_research_station:
+            print(f"{self.city.name} already has a research station")
+            return False
+        
+        # カードが指定されていなければ手札から適切なカードを探す
+        if card is None:
+            for c in self.hand:
+                if (hasattr(c, 'city_name') and c.city_name == self.city.name) or \
+                   (hasattr(c, 'city') and hasattr(c.city, 'name') and c.city.name == self.city.name):
+                    card = c
+                    break
+        
+        # Operations Expert役職の確認
+        is_ops_expert = False
+        if hasattr(self, 'role') and hasattr(self.role, 'name'):
+            is_ops_expert = self.role.name == "Operations Expert"
+        
+        # カードを使用するか、OpsExpertの能力で建設
+        if card:
+            # カード属性の存在チェック
+            if ((hasattr(card, 'city_name') and card.city_name == self.city.name) or
+               (hasattr(card, 'city') and hasattr(card.city, 'name') and card.city.name == self.city.name)):
+                # カードを捨て札に
+                self.hand.remove(card)
+                self.simulation.player_discard_pile.append(card)
+                self.city.has_research_station = True
+                print(f"{self.name} built a research station at {self.city.name}")
+                return True
+            return False
+        elif is_ops_expert:
+            # OpsExpertは市のカードなしで建設可能
             self.city.has_research_station = True
+            print(f"{self.name} (Operations Expert) built a research station at {self.city.name}")
             return True
         
-        city_card = None
-        for card in self.hand:
-            if card.type == "city" and card.city_name == self.city.name:
-                city_card = card
-                break
-        
-        if city_card:
-            self.discard_card(city_card)
-            self.city.has_research_station = True
-            print(f"{self.name} built research station at {self.city.name}.")
-            return True
-        
+        print(f"Cannot build research station at {self.city.name}: no matching city card")
         return False
