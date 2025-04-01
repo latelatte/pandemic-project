@@ -509,7 +509,7 @@ class EAAgent:
         # ===== DISCARD =====
         elif action_type == "discard":
             # Baseline for discarding
-            base_value = 0
+            base_value = -500
             
             card = action.get("card")
             if not card:
@@ -565,10 +565,15 @@ class EAAgent:
             elif role_name == "Operations_Expert" and action_type == "build":
                 # Operations Expert builds research stations easily
                 role_bonus += 700
+                if not action.get("card"):
+                    role_bonus += 300
                 
             elif role_name == "Researcher" and action_type == "share_knowledge":
                 # Researcher excels at sharing knowledge
                 role_bonus += 600
+                card = action.get("card")
+                if card and hasattr(card, 'city_name}') and card.city_name != player.city.name:
+                    role_bonus += 300
         
         # Return final score
         return base_value + role_bonus

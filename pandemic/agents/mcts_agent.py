@@ -592,8 +592,8 @@ class ImprovedMCTSAgent:
     Enhanced Monte Carlo Tree Search agent for Pandemic with strategic heuristics
     and collaboration awareness.
     """
-    def __init__(self, name="MCTS", simulation_count=30, exploration_weight=1.4,
-                max_rollout_depth=7, time_limit=0.2, use_heuristics=True):
+    def __init__(self, name="MCTS", simulation_count=50, exploration_weight=1.4,
+                max_rollout_depth=6, time_limit=0.3, use_heuristics=True):
         self.name = name
         self.simulation_count = simulation_count
         self.exploration_weight = exploration_weight
@@ -811,8 +811,107 @@ class ImprovedMCTSAgent:
         # Pass is generally poor
         elif action_type == "pass":
             bias -= 0.2
+            
+        player = node.state.get("current_player")
+        if hasattr(player, 'role') and player.role:
+            role_name = getattr(player.role, 'name', '')
+            
+            # Medic: Prioritize treatment and movement to infection areas
+            if role_name == "Medic":
+                if action_type == "treat":
+                    bias += 0.3  # Medic is extremely efficient at treating
+                    
+                    # Check if disease is cured (auto-removal capability)
+                    city = action.get("city")
+                    if city and hasattr(city, 'color'):
+                        color = city.color
+                        if color in node.state.get("discovered_cures", []):
+                            bias += 0.2  # Even more valuable with cured disease
+                
+                elif action_type == "move":
+                    # Medic should prioritize moving to infected cities
+                    target_city = action.get("target_city")
+                    if target_city and getattr(target_city, 'infection_level', 0) > 0:
+                        bias += 0.2 * target_city.infection_level
+            
+            # Scientist: Prioritize cure discovery and collecting cards
+            elif role_name == "Scientist":
+                if action_type == "discover_cure":
+                    bias += 0.3  # Already good at this
+                    
+                elif action_type == "move" and priority == "cure_progress":
+                    # Moving toward research stations when we have cards
+                    target_city = action.get("target_city")
+                    if target_city and target_city.has_research_station:
+                        # Count cards by color
+                        cards_by_color = defaultdict(int)
+                        for card in player.hand:
+                            if hasattr(card, 'color') and card.color != "INF":
+                                cards_by_color[card.color] += 1
+                        
+                        # If close to cure with 3+ cards of a color
+                        if any(count >= 3 for count in cards_by_color.values()):
+                            bias += 0.25
+            
+            # Operations Expert: Prioritize building research stations
+            elif role_name == "Operations Expert":
+                if action_type == "build":
+                    bias += 0.3  # General bonus for building
+                    
+                    # Check if this is a strategic location
+                    city = action.get("city")
+                    if city:
+                        # Check if this city connects multiple regions
+                        if len(getattr(city, 'neighbours', [])) >= 4:
+                            bias += 0.2  # Good hub for research station
+            
+            # Researcher: Prioritize knowledge sharing
+            elif role_name == "Researcher":
+                if action_type == "share_knowledge":
+                    bias += 0.4  # Major bonus for sharing as researcher
+                    
+                elif action_type == "move":
+                    # Prioritize moving to cities with other players
+                    target_city = action.get("target_city")
+                    if target_city:
+                        other_players = [p for p in node.state.get("players", []) 
+                                    if p.id != player.id and p.city == target_city]
+                        if other_players:
+                            bias += 0.25  # Bonus for moving to join others
+            
+            # Quarantine Specialist: Protect high-risk areas
+            elif role_name == "Quarantine Specialist":
+                if action_type == "move":
+                    target_city = action.get("target_city")
+                    if target_city:
+                        # Calculate nearby infection
+                        nearby_infection = getattr(target_city, 'infection_level', 0)
+                        for neighbor in getattr(target_city, 'neighbours', []):
+                            nearby_infection += getattr(neighbor, 'infection_level', 0)
+                            
+                        # Bonus based on nearby infection levels
+                        bias += 0.1 * nearby_infection
+            
+            # Dispatcher: Coordinate team movements
+            elif role_name == "Dispatcher":
+                if action_type == "move_player":
+                    bias += 0.3  # Base bonus for special ability
+                    
+                    target = action.get("target_player")
+                    destination = action.get("target_city")
+                    if target and destination:
+                        # Moving players toward research stations
+                        if getattr(destination, 'has_research_station', False):
+                            bias += 0.2
+                            
+                        # Moving players toward high infection
+                        if getattr(destination, 'infection_level', 0) >= 2:
+                            bias += 0.25
         
         return bias
+    
+
+
     
     def _simulate(self, node, depth=0):
         """

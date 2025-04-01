@@ -548,6 +548,23 @@ class ImprovedMARLAgent:
                 "priority": "cure_progress" if outbreak_risk < 0.5 else "control_critical",
                 "secondary": "optimize_positioning"
             }
+            
+
+        has_medic = any(getattr(p, 'role', None) and getattr(p.role, 'name', '') == "Medic"
+                    for p in simulation.players)
+
+        has_scientist = any(getattr(p, 'role', None) and getattr(p.role, 'name', '') == "Scientist"
+                        for p in simulation.players)
+
+        priority = self.team_strategy.get("priority", "balanced_approach")
+        
+        if has_scientist and cure_count < 2:
+            if priority != "control_outbreaks":
+                self.team_strategy["priority"] = "cure_progress"
+
+        if has_medic and infection_pressure > 0.5:
+            if priority != "final_cure":
+                self.team_strategy["secondary"] = "control_critical"
     
     def calculate_strategic_reward(self, player, simulation, action, next_simulation):
         """
@@ -682,6 +699,48 @@ class ImprovedMARLAgent:
         else:
             # Major penalty for new outbreaks
             reward -= 1.0 * (next_outbreaks - current_outbreaks)
+        
+        # 8. Role-specific bonuses
+        # 役職特有の報酬ボーナス
+        role_bonus = 0
+        role_name = getattr(player.role, 'name', '') if hasattr(player, 'role') else ''
+
+        if role_name == "Medic" and action_type == "treat":
+
+            city = action.get("city", player.city)
+            if city and city.infection_level > 1:
+                role_bonus += 1.5
+
+            for disease in simulation.diseases:
+                if disease.get("cured", False) and disease.get("color") == city.color:
+                    role_bonus += 0.8
+                    
+        elif role_name == "Scientist" and action_type == "discover_cure":
+            role_bonus += 2.0
+            
+        elif role_name == "Operations_Expert" and action_type == "build":
+            if not action.get("card"):
+                role_bonus += 1.5
+            
+        elif role_name == "Researcher" and action_type == "share_knowledge":
+            card = action.get("card")
+            if card and hasattr(card, 'city_name') and card.city_name != player.city.name:
+                role_bonus += 1.2
+                
+        elif role_name == "Dispatcher" and action_type == "move_player":
+            role_bonus += 1.0
+                
+        elif role_name == "Quarantine Specialist":
+            if action_type == "move":
+                target_city = action.get("target_city")
+                if target_city:
+                    nearby_infection = sum(getattr(c, 'infection_level', 0) 
+                                        for c in [target_city] + getattr(target_city, 'neighbours', []))
+                    if nearby_infection >= 3:
+                        role_bonus += 1.5
+
+        # 最終報酬に役職ボーナスを加算
+        reward += role_bonus
         
         return reward
     
@@ -1123,9 +1182,17 @@ def marl_agent_strategy(player):
     # Get simulation from player
     simulation = player.simulation
     
+    role_name = getattr(player.role, 'name', '') if hasattr(player, 'role') else ''
     # Check for emergency situations first
     if player.city.infection_level >= 3:
-        # debug_log(f"EMERGENCY: Critical infection in {player.city.name}")
+        if role_name == "Medic":
+            # Medic can treat all cubes in a city
+            return {"type": "treat", "city": player.city}
+        elif role_name == "Quarantine Specialist":
+            high_risk_neighbors = [c for c in player.city.neighbours 
+                             if getattr(c, 'infection_level', 0) >= 2]
+            if high_risk_neighbors:
+                return {"type": "treat", "city": player.city}
         return {"type": "treat", "city": player.city}
     
     # Check for hand limit
