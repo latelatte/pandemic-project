@@ -250,9 +250,9 @@ class IntegratedEvaluationFramework:
         self.fixed_resource_results = {}
         
         # Default settings
-        self.default_episodes = 1 # 5000 episodes # later デバッグ用に変更してます
-        self.default_resource_time = 30  # 12 hours # later デバッグ用に変更してます
-        self.eval_episodes = 1 # 1000 episodes #*デバッグ用に変更してます
+        self.default_episodes = 1500
+        self.default_resource_time = 5 * 60 * 60
+        self.eval_episodes = 500
         
         # Load settings file
         self.settings = self._load_evaluation_config()
@@ -269,10 +269,10 @@ class IntegratedEvaluationFramework:
             "fixed_episodes": self.default_episodes,
             "fixed_resource_time": self.default_resource_time,
             "eval_episodes": self.eval_episodes,
-            "convergence_max_episodes": 1, # 50000 episodes #*変更しています
-            "convergence_max_time": 30,  # 48 hours #*変更しています
-            "convergence_window": 100,
-            "convergence_threshold": 0.05, # 0.02 #*変更しています
+            "convergence_max_episodes": 10000,
+            "convergence_max_time": 12 * 60 * 60,
+            "convergence_window": 500,
+            "convergence_threshold": 0.03,
             "convergence_stability": 3,
             "num_players": 4,
             "difficulty": "normal",
