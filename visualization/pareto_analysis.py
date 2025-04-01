@@ -881,6 +881,11 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
         metrics["agent_performance"][agent_name] = data.get("agent_performance", {}).get(agent_name, {})
         metrics["resource_usage"][agent_name] = data.get("resource_usage", {}).get(agent_name, {})
         
+    for agent_name, data in fixed_resources.items():
+        resource_agent_name = f"{agent_name} (Fixed Resource)"
+        metrics["agent_performance"][resource_agent_name] = data.get("agent_performance", {}).get(agent_name, {})
+        metrics["resource_usage"][resource_agent_name] = data.get("resource_usage", {}).get(agent_name, {})
+        
     metrics_path = os.path.join(output_dir, "metrics.json")
     with open(metrics_path, 'w') as f:
         json.dump(metrics, f, indent=2)

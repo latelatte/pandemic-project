@@ -161,39 +161,36 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# 実験結果・ログ
 logs/
 experiment_*/
 *.log
 results/
 evaluations/
 
-# モデル保存ファイル
+
 *.pt
 *.pth
 *.pkl
 agents_state/
 
-# MacOS固有ファイル
 .DS_Store
 ._*
 
-# VSCode設定（チーム開発時に個人設定を共有したくない場合）
 .vscode/
 
-# 一時ファイル
 temp/
 *.tmp
 
-# 実行時に生成されるデータファイル
 *.json
 *.csv
-# 必要なJSONファイルは!で除外指定する
+
+# config files
 !/pandemic/config/*.json
 
-# 可視化出力
 *.png
 *.jpg
 *.pdf
-# 保持したい画像ファイルは!で除外指定する
+
 !docs/images/*.png
+
+setup.py

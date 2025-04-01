@@ -1643,7 +1643,7 @@ def ea_agent_strategy(player):
     import os
     agent_state_dir = "./agents_state"
     os.makedirs(agent_state_dir, exist_ok=True)
-    state_file = os.path.join(agent_state_dir, "ea_agent_state.pkl")
+    state_file = os.path.join(agent_state_dir, "eaagent_state.pkl")
     
     if '_global_ea_agent' not in globals():
         global _global_ea_agent
@@ -1665,7 +1665,7 @@ def ea_agent_strategy(player):
     simulation = player.simulation
     
     # Enable debug logging
-    debug_enabled = True
+    debug_enabled = False
     
     def debug_log(message):
         if debug_enabled:
@@ -1673,13 +1673,13 @@ def ea_agent_strategy(player):
     
     # Check for emergency situations
     if player.city.infection_level >= 3:
-        debug_log(f"EMERGENCY: Treating critical infection in {player.city.name}")
+        # _log(f"EMERGENCY: Treating critical infection in {player.city.name}")
         return {"type": "treat", "city": player.city}
     
     # Check for hand limit
     if len(player.hand) > 7:
         discard_card = _global_ea_agent._find_best_discard(player, simulation)
-        debug_log(f"HAND LIMIT: Discarding card {getattr(discard_card, 'city_name', 'unknown')}")
+        # debug_log(f"HAND LIMIT: Discarding card {getattr(discard_card, 'city_name', 'unknown')}")
         return {"type": "discard", "card": discard_card}
     
     # Update game assessment
@@ -1687,18 +1687,18 @@ def ea_agent_strategy(player):
     
     # Decide on strategic objective
     objective = _global_ea_agent._select_strategic_objective(player, simulation)
-    debug_log(f"OBJECTIVE: {objective}")
+    # debug_log(f"OBJECTIVE: {objective}")
     
     # Try to discover cure (highest priority if possible)
     cure_action = _global_ea_agent._try_discover_cure(player, simulation)
     if cure_action:
-        debug_log(f"PRIORITY: Discovering cure for {cure_action.get('color')}")
+        # debug_log(f"PRIORITY: Discovering cure for {cure_action.get('color')}")
         return cure_action
     
     # Check for cooperative actions
     coop_action = _global_ea_agent._plan_cooperative_action(player, simulation)
     if coop_action:
-        debug_log(f"COOPERATION: {coop_action.get('type')}")
+        # debug_log(f"COOPERATION: {coop_action.get('type')}")
         return coop_action
     
     # Decide best action
@@ -1708,7 +1708,7 @@ def ea_agent_strategy(player):
     if action.get("type") == "move":
         _global_ea_agent._update_movement_history(player, action)
         target_city = action.get("target_city")
-        debug_log(f"MOVEMENT: To {target_city.name}")
+        #debug_log(f"MOVEMENT: To {target_city.name}")
     
     # Periodically save agent state
     if random.random() < 0.1:  # 10% chance each turn
@@ -1721,7 +1721,7 @@ def ea_agent_strategy(player):
             }
             with open(state_file, "wb") as f:
                 pickle.dump(saved_state, f)
-                debug_log(f"Saved agent state to {state_file}")
+                # debug_log(f"Saved agent state to {state_file}")
         except:
             debug_log(f"Failed to save agent state")
     

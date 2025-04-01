@@ -1054,7 +1054,7 @@ class ImprovedMARLAgent:
         
         return sim_copy
     
-    def save_state(self, filepath="marl_agent_state.pt"):
+    def save_state(self, filepath="marlagent_state.pt"):
         """Save agent state to file"""
         save_data = {
             "policy_net": self.policy_net.state_dict(),
@@ -1069,7 +1069,7 @@ class ImprovedMARLAgent:
         torch.save(save_data, filepath)
         print(f"MARL agent state saved in {filepath} (epsilon: {self.epsilon:.4f}, steps: {self.total_train_steps})")
     
-    def load_state(self, filepath="marl_agent_state.pt"):
+    def load_state(self, filepath="marlagent_state.pt"):
         """Load agent state from file"""
         try:
             if os.path.exists(filepath):
@@ -1106,7 +1106,7 @@ def marl_agent_strategy(player):
     import os
     agent_state_dir = "./agents_state"
     os.makedirs(agent_state_dir, exist_ok=True)
-    state_file = os.path.join(agent_state_dir, "marl_agent_state.pt")
+    state_file = os.path.join(agent_state_dir, "marlagent_state.pt")
     
     if _global_marl_agent is None:
         _global_marl_agent = ImprovedMARLAgent()
@@ -1114,7 +1114,7 @@ def marl_agent_strategy(player):
         _global_marl_agent.load_state(state_file)
     
     # Enable debug logging
-    debug_enabled = True
+    debug_enabled = False
     
     def debug_log(message):
         if debug_enabled:
@@ -1125,7 +1125,7 @@ def marl_agent_strategy(player):
     
     # Check for emergency situations first
     if player.city.infection_level >= 3:
-        debug_log(f"EMERGENCY: Critical infection in {player.city.name}")
+        # debug_log(f"EMERGENCY: Critical infection in {player.city.name}")
         return {"type": "treat", "city": player.city}
     
     # Check for hand limit
@@ -1137,19 +1137,19 @@ def marl_agent_strategy(player):
             non_matching_cards = [card for card in city_cards 
                                 if card.city_name != player.city.name]
             if non_matching_cards:
-                debug_log(f"HAND LIMIT: Discarding card for {non_matching_cards[0].city_name}")
+                # debug_log(f"HAND LIMIT: Discarding card for {non_matching_cards[0].city_name}")
                 return {"type": "discard", "card": non_matching_cards[0]}
-            debug_log(f"HAND LIMIT: Discarding card for {city_cards[0].city_name}")
+            # debug_log(f"HAND LIMIT: Discarding card for {city_cards[0].city_name}")
             return {"type": "discard", "card": city_cards[0]}
         
         # If no city cards, discard first card
-        debug_log(f"HAND LIMIT: Discarding card (no suitable city cards)")
+        # debug_log(f"HAND LIMIT: Discarding card (no suitable city cards)")
         return {"type": "discard", "card": player.hand[0]}
     
     # Update strategy based on game state
     _global_marl_agent._update_team_strategy(simulation)
     priority = _global_marl_agent.team_strategy.get("priority", "balanced_approach")
-    debug_log(f"STRATEGY: {priority}")
+    # debug_log(f"STRATEGY: {priority}")
     
     # Check for cure discovery opportunity (highest priority if possible)
     if player.city.has_research_station:
@@ -1164,7 +1164,7 @@ def marl_agent_strategy(player):
         
         for color, cards in cards_by_color.items():
             if color not in discovered_cures and len(cards) >= cards_needed:
-                debug_log(f"PRIORITY: Discovering cure for {color}")
+                # debug_log(f"PRIORITY: Discovering cure for {color}")
                 return {
                     "type": "discover_cure",
                     "color": color,
@@ -1175,23 +1175,23 @@ def marl_agent_strategy(player):
     action = _global_marl_agent.decide_action(player, simulation)
     
     # Log selected action for debugging
-    if action:
-        action_type = action.get("type", "unknown")
-        if action_type == "move":
-            target_city = action.get("target_city")
-            if target_city:
-                debug_log(f"ACTION: Moving to {target_city.name}")
-        elif action_type == "treat":
-            debug_log(f"ACTION: Treating infection in {player.city.name}")
-        elif action_type == "build":
-            debug_log(f"ACTION: Building research station in {player.city.name}")
-        elif action_type == "share_knowledge":
-            recipient = action.get("recipient")
-            card = action.get("card")
-            if recipient and card:
-                debug_log(f"ACTION: Sharing card for {card.city_name} with {recipient.name}")
-        else:
-            debug_log(f"ACTION: {action_type}")
+    # if action:
+    #     action_type = action.get("type", "unknown")
+    #     if action_type == "move":
+    #         target_city = action.get("target_city")
+    #         if target_city:
+    #             debug_log(f"ACTION: Moving to {target_city.name}")
+    #     elif action_type == "treat":
+    #         debug_log(f"ACTION: Treating infection in {player.city.name}")
+    #     elif action_type == "build":
+    #         debug_log(f"ACTION: Building research station in {player.city.name}")
+    #     elif action_type == "share_knowledge":
+    #         recipient = action.get("recipient")
+    #         card = action.get("card")
+    #         if recipient and card:
+    #             debug_log(f"ACTION: Sharing card for {card.city_name} with {recipient.name}")
+    #     else:
+    #         debug_log(f"ACTION: {action_type}")
     
     # Periodically save agent state
     if random.random() < 0.1:  # 10% chance each turn

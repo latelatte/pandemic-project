@@ -831,7 +831,7 @@ class ImprovedMCTSAgent:
         """
         Perform MCTS to find the best action
         """
-        debug_enabled = True
+        debug_enabled = False
         def debug_log(message):
             if debug_enabled:
                 print(f"[MCTS-DEBUG] {message}")
@@ -840,7 +840,7 @@ class ImprovedMCTSAgent:
         
         # Check for emergency situations first
         if player.city.infection_level >= 3:
-            debug_log(f"EMERGENCY: Critical infection in {player.city.name}")
+            # debug_log(f"EMERGENCY: Critical infection in {player.city.name}")
             return {"type": "treat", "city": player.city}
         
         # Check for hand limit
@@ -852,19 +852,19 @@ class ImprovedMCTSAgent:
                 non_matching_cards = [card for card in city_cards 
                                     if card.city_name != player.city.name]
                 if non_matching_cards:
-                    debug_log(f"HAND LIMIT: Discarding card for {non_matching_cards[0].city_name}")
+                    # debug_log(f"HAND LIMIT: Discarding card for {non_matching_cards[0].city_name}")
                     return {"type": "discard", "card": non_matching_cards[0]}
-                debug_log(f"HAND LIMIT: Discarding card for {city_cards[0].city_name}")
+                # debug_log(f"HAND LIMIT: Discarding card for {city_cards[0].city_name}")
                 return {"type": "discard", "card": city_cards[0]}
             
             # If no city cards, discard first card
-            debug_log(f"HAND LIMIT: Discarding card (no suitable city cards)")
+            # debug_log(f"HAND LIMIT: Discarding card (no suitable city cards)")
             return {"type": "discard", "card": player.hand[0]}
         
         # Update team strategy
         self._update_team_strategy(simulation)
         priority = self.team_strategy.get("priority", "balanced_approach")
-        debug_log(f"STRATEGY: {priority}")
+        # debug_log(f"STRATEGY: {priority}")
         
         # Extract state from simulation
         root_state = self._extract_state(simulation, player)
@@ -891,7 +891,7 @@ class ImprovedMCTSAgent:
             
             for color, cards in cards_by_color.items():
                 if color not in discovered_cures and len(cards) >= cards_needed:
-                    debug_log(f"OPPORTUNITY: Can discover cure for {color}")
+                    # debug_log(f"OPPORTUNITY: Can discover cure for {color}")
                     return {
                         "type": "discover_cure",
                         "color": color,
@@ -931,11 +931,11 @@ class ImprovedMCTSAgent:
         self.total_simulations += simulation_count
         self.thinking_time = time.time() - start_time
         
-        debug_log(f"Performed {simulation_count} simulations in {self.thinking_time:.3f}s")
+        # debug_log(f"Performed {simulation_count} simulations in {self.thinking_time:.3f}s")
         
         # Choose best action (most visited child)
         if not root.children:
-            debug_log("No valid actions found")
+            # debug_log("No valid actions found")
             return {"type": "pass"}
         
         # Calculate action scores
@@ -1015,7 +1015,7 @@ class ImprovedMCTSAgent:
         
         return best_action
     
-    def save_state(self, filepath="mcts_agent_state.pkl"):
+    def save_state(self, filepath="mctsagent_state.pkl"):
         """Save agent state to file"""
         # Don't save node cache (too large)
         save_data = {
@@ -1034,7 +1034,7 @@ class ImprovedMCTSAgent:
             pickle.dump(save_data, f)
         print(f"MCTS agent state saved in {filepath}")
     
-    def load_state(self, filepath="mcts_agent_state.pkl"):
+    def load_state(self, filepath="mctsagent_state.pkl"):
         """Load agent state from file"""
         try:
             if os.path.exists(filepath):
@@ -1076,7 +1076,7 @@ def mcts_agent_strategy(player):
     import os
     agent_state_dir = "./agents_state"
     os.makedirs(agent_state_dir, exist_ok=True)
-    state_file = os.path.join(agent_state_dir, "mcts_agent_state.pkl")
+    state_file = os.path.join(agent_state_dir, "mctsagent_state.pkl")
     
     if _global_mcts_agent is None:
         _global_mcts_agent = ImprovedMCTSAgent()
