@@ -47,43 +47,41 @@ class Player:
         remaining_actions = self.simulation.actions_per_turn
         print(f"--- {self.name}'s turn starting with {len(self.hand)} cards in hand ---")
         
-        used_cards = set()  # ターン中に使用したカードを追跡
-        
+        used_cards = set() 
         while remaining_actions > 0:
-            # 更新された手札情報でアクションを決定
             available_hand = [card for card in self.hand if id(card) not in [id(c) for c in used_cards]]
             
-            # 一時的に手札を更新して意思決定
             actual_hand = self.hand.copy()
             self.hand = available_hand
             
             action = self.strategy(self)
             
-            # 元の手札に戻す
             self.hand = actual_hand
             
             if not action:
                 break
-                
-            # アクションの実行とカードの追跡
+            
+            self._execute_action(action)
+            remaining_actions -= 1
+            
             if action["type"] == "move" and action.get("method") in ["direct_flight", "charter_flight"]:
                 card = action.get("card")
                 if card:
-                    if card in self.hand:  # カードが実際に手札にあるか確認
+                    if card in self.hand: 
                         used_cards.add(card)
                         self.hand.remove(card)
                         self.simulation.player_discard_pile.append(card)
                         print(f"{self.name} discarded {card} for {action.get('method')}")
                     else:
                         print(f"ERROR: Card {card} not in hand!")
-                        action["method"] = "standard"  # カードがなければ標準移動に変更
+                        action["method"] = "standard" 
             
-            # 他のカードを使用するアクション（治療薬発見など）も同様に処理
+
             elif action["type"] == "discover_cure":
                 cards = action.get("cards", [])
                 valid_cards = [c for c in cards if c in self.hand]
-                if len(valid_cards) >= 4:  # 最低4枚必要
-                    for card in valid_cards[:5]:  # 最大5枚使用
+                if len(valid_cards) >= 4: 
+                    for card in valid_cards[:5]: 
                         if card in self.hand:
                             used_cards.add(card)
                             self.hand.remove(card)
@@ -91,36 +89,12 @@ class Player:
                     print(f"{self.name} used {len(valid_cards)} cards for cure discovery")
                 else:
                     print(f"ERROR: Not enough valid cards for cure discovery")
-                    action = {"type": "pass"}  # 代わりにパスに変更
+                    action = {"type": "pass"} 
             
-            # アクション実行（simulation内の対応するメソッドを呼び出す）
+
             self._execute_action(action)
             remaining_actions -= 1
 
-        # アクション終了後、手札上限チェック
-        max_hand_size = 7
-        while len(self.hand) > max_hand_size:
-            print(f"{self.name} must discard down to {max_hand_size} cards")
-            # エージェントに破棄カードを選択させる
-            discard_action = self.strategy(self)
-            if discard_action and discard_action.get("type") == "discard":
-                card = discard_action.get("card")
-                if card in self.hand:
-                    self.hand.remove(card)
-                    self.simulation.player_discard_pile.append(card)
-                    print(f"{self.name} discarded {card}")
-                else:
-                    # 指定されたカードが手札にない場合、ランダムに1枚破棄
-                    card = random.choice(self.hand)
-                    self.hand.remove(card)
-                    self.simulation.player_discard_pile.append(card)
-                    print(f"{self.name} randomly discarded {card}")
-            else:
-                # 破棄アクションが返されなかった場合、ランダムに1枚破棄
-                card = random.choice(self.hand)
-                self.hand.remove(card)
-                self.simulation.player_discard_pile.append(card)
-                print(f"{self.name} randomly discarded {card}")
 
     def _execute_action(self, action):
         """
@@ -136,17 +110,14 @@ class Player:
         elif action_type == "treat":
             city = action.get("city", self.city)
             color = action.get("color", "Blue")
-            # 既存のメソッドに委譲
             self.simulation.treat_disease(self, city, color)
         
         elif action_type == "build":
-            # カードが指定されていれば使用
             card = action.get("card")
             self.build_research_station(card)
         
         elif action_type == "discover_cure":
             color = action.get("color")
-            # 既に手札からカードは削除済み
             self.simulation.discover_cure(self, color)
         
         elif action_type == "share_knowledge":
@@ -154,7 +125,6 @@ class Player:
             target_player = action.get("target_player")
             card = action.get("card")
             
-            # 知識共有の実装
             if card and target_player:
                 if direction == "give":
                     target_player.hand.append(card)

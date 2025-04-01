@@ -273,6 +273,27 @@ class PandemicSimulation:
             else:
                 player.hand.append(card)
                 print(f"{player.name} draws {card}")
+                
+        max_hand_size = 7
+        while len(player.hand) > max_hand_size:
+            print(f"{player.name} must discard down to {max_hand_size} cards")
+            discard_action = player.strategy(player)
+            if discard_action and discard_action.get("type") == "discard":
+                card = discard_action.get("card")
+                if card in player.hand:
+                    player.hand.remove(card)
+                    self.player_discard_pile.append(card)
+                    print(f"{player.name} discarded {card}")
+                else:
+                    card = random.choice(player.hand)
+                    player.hand.remove(card)
+                    self.player_discard_pile.append(card)
+                    print(f"{player.name} randomly discarded {card}")
+            else:
+                card = random.choice(player.hand)
+                player.hand.remove(card)
+                self.player_discard_pile.append(card)
+                print(f"{player.name} randomly discarded {card}")
 
     @property
     def infection_rate(self):
