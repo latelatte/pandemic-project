@@ -445,7 +445,6 @@ class IntegratedEvaluationFramework:
                 difficulty=self.settings["difficulty"],
             )
             metrics = runner.run_experiments([(strategy_func, strategy_name)], config_dir=self.config_dir)
-            print(f"デバッグ：resource monitorに渡してる引数はこれ！ → {strategy_name}")
             
             # Add resource usage information
             if "resource_usage" not in metrics:
