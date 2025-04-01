@@ -250,8 +250,8 @@ class IntegratedEvaluationFramework:
         self.fixed_resource_results = {}
         
         # Default settings
-        self.default_episodes = 1 # 5000 episodes #*デバッグ用に変更してます
-        self.default_resource_time = 30  # 12 hours #*デバッグ用に
+        self.default_episodes = 1 # 5000 episodes # later デバッグ用に変更してます
+        self.default_resource_time = 30  # 12 hours # later デバッグ用に変更してます
         self.eval_episodes = 1 # 1000 episodes #*デバッグ用に変更してます
         
         # Load settings file

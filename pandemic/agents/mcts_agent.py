@@ -592,8 +592,8 @@ class ImprovedMCTSAgent:
     Enhanced Monte Carlo Tree Search agent for Pandemic with strategic heuristics
     and collaboration awareness.
     """
-    def __init__(self, name="MCTS", simulation_count=100, exploration_weight=1.4,
-                max_rollout_depth=10, time_limit=0.95, use_heuristics=True):
+    def __init__(self, name="MCTS", simulation_count=30, exploration_weight=1.4,
+                max_rollout_depth=7, time_limit=0.2, use_heuristics=True):
         self.name = name
         self.simulation_count = simulation_count
         self.exploration_weight = exploration_weight
