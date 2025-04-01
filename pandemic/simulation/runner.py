@@ -195,8 +195,7 @@ class SimulationRunner:
         
         print("\n===AGENT PERFORMANCE===")
         for name, data in metrics_summary['agent_performance'].items():
-            print(f"{name}: Avg time per move: {data['avg_time_ms']:.2f}ms, " 
-                  f"Win contribution: {data['win_contribution']*100/self.n_episodes:.2f}%")
+            print(f"{name}: Avg time per move: {data['avg_time_ms']:.2f}ms")
         
         print("\n===RESOURCE USAGE===")
         resource_summary = self.resource_monitor.get_summary()
@@ -219,9 +218,9 @@ class SimulationRunner:
             self.logger.writer.add_scalar(f'Evaluation/{agent_name}/AvgTime', 
                                          data['avg_time_ms'], current_episode)
             
-            win_contribution = data['win_contribution'] / max(1, current_episode)
-            self.logger.writer.add_scalar(f'Evaluation/{agent_name}/WinContribution', 
-                                         win_contribution * 100, current_episode)
+            win_rates = data['win_rates'] / max(1, current_episode)
+            self.logger.writer.add_scalar(f'Evaluation/{agent_name}/WinRates', 
+                                         win_rates * 100, current_episode)
 
 
 if __name__ == "__main__":

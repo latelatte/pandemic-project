@@ -303,7 +303,7 @@ def create_cnp_visualization(data, output_dir):
     
     for i, row in resource_df.iterrows():
         plt.annotate(
-            f"{row['CNP']:.1f}", 
+            f"{row['CNP']:.3f}", 
             (row["Episodes"], row["Win Rate (%)"]),
             xytext=(5, 5),
             textcoords="offset points",

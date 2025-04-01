@@ -1119,25 +1119,25 @@ class ImprovedMCTSAgent:
                 self.value_sum[state_key][action_type] / self.visit_counts[state_key][action_type]
             )
         
-        # Log decision
-        if action_type == "move":
-            target_city = best_action.get("target_city")
-            if target_city:
-                debug_log(f"ACTION: Moving to {target_city.name}")
-        elif action_type == "treat":
-            debug_log(f"ACTION: Treating infection in {player.city.name}")
-        elif action_type == "build":
-            debug_log(f"ACTION: Building research station in {player.city.name}")
-        elif action_type == "discover_cure":
-            color = best_action.get("color")
-            debug_log(f"ACTION: Discovering cure for {color}")
-        elif action_type == "share_knowledge":
-            card = best_action.get("card")
-            recipient = best_action.get("recipient") 
-            if card and recipient:
-                debug_log(f"ACTION: Sharing {card.city_name} card with {recipient.name}")
-        else:
-            debug_log(f"ACTION: {action_type}")
+        # # Log decision
+        # if action_type == "move":
+        #     target_city = best_action.get("target_city")
+        #     if target_city:
+        #         debug_log(f"ACTION: Moving to {target_city.name}")
+        # elif action_type == "treat":
+        #     debug_log(f"ACTION: Treating infection in {player.city.name}")
+        # elif action_type == "build":
+        #     debug_log(f"ACTION: Building research station in {player.city.name}")
+        # elif action_type == "discover_cure":
+        #     color = best_action.get("color")
+        #     debug_log(f"ACTION: Discovering cure for {color}")
+        # elif action_type == "share_knowledge":
+        #     card = best_action.get("card")
+        #     recipient = best_action.get("recipient") 
+        #     if card and recipient:
+        #         debug_log(f"ACTION: Sharing {card.city_name} card with {recipient.name}")
+        # else:
+        #     debug_log(f"ACTION: {action_type}")
         # print("===== MCTS ACTION DEBUG =====")
         # print(f"Player: {player.name} at {player.city.name if player.city else 'None'}")
         # if best_action.get("type") == "move":

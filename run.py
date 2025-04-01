@@ -249,7 +249,7 @@ class IntegratedEvaluationFramework:
         self.fixed_episodes_results = {}
         self.fixed_resource_results = {}
         
-        # Default settings
+        #* ここでデフォルトのエピソード数とリソース時間を設定
         self.default_episodes = 1500
         self.default_resource_time = 5 * 60 * 60
         self.eval_episodes = 500

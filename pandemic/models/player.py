@@ -44,20 +44,17 @@ class Player:
         return self.strategy_func(player) 
 
     def perform_turn(self):
-        print(f"DEBUG: Entering perform_turn for {self.name}")
         remaining_actions = self.simulation.actions_per_turn
         print(f"--- {self.name}'s turn starting with {len(self.hand)} cards in hand ---")
         
         used_cards = set() 
         while remaining_actions > 0:
-            print(f"DEBUG: About to call strategy with {remaining_actions} actions left")
             available_hand = [card for card in self.hand if id(card) not in [id(c) for c in used_cards]]
             
             actual_hand = self.hand.copy()
             self.hand = available_hand
             
             action = self.strategy(self)
-            print(f"DEBUG: Strategy returned action type: {action.get('type') if action else 'None'}")
             
             self.hand = actual_hand
             

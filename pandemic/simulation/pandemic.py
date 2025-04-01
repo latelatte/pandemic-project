@@ -158,9 +158,9 @@ class PandemicSimulation:
     def _create_player_deck(self):
         all_colors = ["Blue", "Red", "Yellow"]
         
-        # 都市数が20未満の場合、multiplierを大きくする（都市数が少ないことを補償）
+        #* プレイヤーデッキのサイズを都市数に基づいて調整
         if len(self.cities) < 20:
-            multiplier = 6  # 大幅に増加
+            multiplier = 6
         else:
             multiplier = 4
         
@@ -169,14 +169,14 @@ class PandemicSimulation:
             for _ in range(multiplier):
                 citycards.append(Card("CITY", city_name=city.name, color=random.choice(all_colors)))
 
-        # エピデミックカード数を調整（難易度設定から取得）
-        epidemic_count = 3  # 少なくした
+        #* エピデミックカード数を調整
+        epidemic_count = 3
         epidemic_cards = [Card("EPIDEMIC")] * epidemic_count
         
         deck = citycards + epidemic_cards
         random.shuffle(deck)
-        print(f"Created player deck with {len(deck)} cards ({len(citycards)} city cards, {epidemic_count} epidemics)")
-        print(f"Total cities: {len(self.cities)}")  # 都市数を出力してデバッグ
+        # print(f"Created player deck with {len(deck)} cards ({len(citycards)} city cards, {epidemic_count} epidemics)")
+        # print(f"Total cities: {len(self.cities)}")  # 都市数を出力してデバッグ
         return deck
 
     def _create_infection_deck(self):
@@ -245,7 +245,6 @@ class PandemicSimulation:
                 self.draw_player_cards(p)
                 self.infection_phase()
                 
-                # ターン終了時にアウトブレイクマーカーをリセット
                 for city in self.cities:
                     if hasattr(city, 'outbreak_marker'):
                         city.outbreak_marker = False
@@ -310,12 +309,12 @@ class PandemicSimulation:
             self.infection_rate_index += 1
             print(f"Infection rate increased to {self.infection_rate}")
         
-        bottom_card = self.infection_deck.pop(0)  # 一番下のカードを取得
+        bottom_card = self.infection_deck.pop(0)  # get the bottom card
         city_ = self.find_city(bottom_card.city_name)
         print(f"Epidemic hits {city_.name}!")
         city_.increase_infection(3)  
 
-        # ここでインフェクションの捨て札をデッキに戻しています
+        # Infection discard pile is shuffled and placed on top of the infection deck
         if self.infection_discard_pile:
             random.shuffle(self.infection_discard_pile)
             self.infection_deck.extend(self.infection_discard_pile)

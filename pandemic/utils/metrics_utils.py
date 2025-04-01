@@ -25,7 +25,7 @@ class MetricsCollector:
                 self.agent_stats[name] = {
                     "total_time": 0.0,
                     "calls": 0,
-                    "win_contribution": 0,
+                    "win_rates": 0,
                     "treatments": 0
                 }
 
@@ -37,10 +37,8 @@ class MetricsCollector:
         )
         
         if win:
-            for p in simulation.players:
-                self.metrics['win_rates'][p.strategy_name] += 1/len(simulation.players)
-                
-                self.agent_stats[p.strategy_name]["win_contribution"] += 1
+            for strategy_name in set(p.strategy_name for p in simulation.players):    
+                self.metrics['win_rates'][strategy_name] += 1
     
     def record_action_time(self, agent_name, time_taken):
         """records the time taken for an agent to make a move"""
@@ -48,7 +46,7 @@ class MetricsCollector:
             self.agent_stats[agent_name] = {
                 "total_time": 0.0,
                 "calls": 0,
-                "win_contribution": 0,
+                "win_rates": 0,
                 "treatments": 0
             }
 
@@ -80,7 +78,7 @@ class MetricsCollector:
             
             summary['agent_performance'][agent_name] = {
                 "avg_time_ms": float(avg_time * 1000.0),  # convert to ms
-                "win_contribution": stats.get("win_contribution", 0),
+                "win_rates": stats.get("win_rates", 0),
                 "treatments": stats.get("treatments", 0)
             }
         

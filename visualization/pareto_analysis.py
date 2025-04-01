@@ -24,7 +24,7 @@ def load_agent_data(results_dir):
             resource_usage = data.get("resource_usage", {}).get(agent_name, {})
             agent_data = {
                 "Agent": agent_name,
-                "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+                "Win Rate (%)": metrics.get("win_rates", 0) * 100,
                 "Avg Time (ms)": metrics.get("avg_time_ms", 0),
                 "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
                 "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
@@ -66,7 +66,7 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
                     }
                 
                 resource_usage = data.get("resource_usage", {}).get(agent_name, {})
-                win_rate = metrics.get("win_contribution", 0) * 100
+                win_rate = metrics.get("win_rates", 0) * 100
                 avg_time = metrics.get("avg_time_ms", 0)
                 memory = resource_usage.get("avg_memory_mb", 0)
                 cpu = resource_usage.get("avg_cpu_percent", 0)
@@ -843,7 +843,7 @@ def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5):
         resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
         agent_data.append({
             "Agent": agent_name,
-            "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+            "Win Rate (%)": metrics.get("win_rates", 0) * 100,
             "Avg Time (ms)": metrics.get("avg_time_ms", 0),
             "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
             "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
@@ -911,7 +911,7 @@ def run_adapted_pareto_analysis(evaluation_dir="./evaluations"):
         resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
         agent_data.append({
             "Agent": agent_name,
-            "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+            "Win Rate (%)": metrics.get("win_rates", 0) * 100,
             "Avg Time (ms)": metrics.get("avg_time_ms", 0),
             "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
             "CPU (%)": resource_usage.get("avg_cpu_percent", 0),

@@ -59,7 +59,7 @@ def create_performance_charts(results_dir, output_dir="./plots"):
         for agent_name, metrics in data.get("agent_performance", {}).items():
             agent_data = {
                 "Agent": agent_name,
-                "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+                "Win Rate (%)": metrics.get("win_rates", 0) * 100,
                 "Avg Time (ms)": metrics.get("avg_time_ms", 0),
                 "Memory (MB)": data.get("resource_usage", {}).get(agent_name, {}).get("avg_memory_mb", 0)
             }

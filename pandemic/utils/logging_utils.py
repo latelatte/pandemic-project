@@ -43,9 +43,9 @@ class SimulationLogger:
         
         if metrics and 'agent_performance' in metrics:
             for name, perf in metrics['agent_performance'].items():
-                if 'win_contribution' in perf:
+                if 'win_rates' in perf:
                     self.writer.add_scalar(f'Learning/{name}/WinContribution', 
-                                           perf['win_contribution'], episode)
+                                           perf['win_rates'], episode)
         
     def save_episode_log(self, simulation, episode_num):
         """save episode log to file"""
