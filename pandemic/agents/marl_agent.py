@@ -644,6 +644,20 @@ class ImprovedMARLAgent:
                                          for p in simulation.players)
                 if other_players_present:
                     reward += 0.5
+                    
+                if target_city:
+                    player_id = player.id
+                    
+            if target_city.name == player.city.name:
+                return -3.0
+                
+            if player_id in self.movement_history:
+                recent_visits = self.movement_history[player_id]
+                if target_city.name in recent_visits:
+                    visit_count = recent_visits.count(target_city.name)
+                    recent_penalty = sum(0.5 for i, city in enumerate(reversed(recent_visits))
+                                      if city == target_city.name and i < 3) #* 直近3回はペナルティ
+                    reward -= (visit_count * 0.5 + recent_penalty)
         
         elif action_type == "discover_cure":
             # Already covered by cure count check, but add slight bonus for attempt
@@ -701,19 +715,24 @@ class ImprovedMARLAgent:
             reward -= 1.0 * (next_outbreaks - current_outbreaks)
         
         # 8. Role-specific bonuses
-        # 役職特有の報酬ボーナス
         role_bonus = 0
         role_name = getattr(player.role, 'name', '') if hasattr(player, 'role') else ''
 
         if role_name == "Medic" and action_type == "treat":
-
             city = action.get("city", player.city)
             if city and city.infection_level > 1:
                 role_bonus += 1.5
 
-            for disease in simulation.diseases:
-                if disease.get("cured", False) and disease.get("color") == city.color:
-                    role_bonus += 0.8
+            city_colors = getattr(simulation, 'city_colors', {})
+            if city_colors and city and city.name in city_colors:
+                city_color = city_colors[city.name]
+                for disease in simulation.diseases:
+                    if disease.get("cured", False) and disease.get("color") == city_color:
+                        role_bonus += 0.8
+            else:
+                for disease in simulation.diseases:
+                    if disease.get("cured", False):
+                        role_bonus += 0.4
                     
         elif role_name == "Scientist" and action_type == "discover_cure":
             role_bonus += 2.0
@@ -851,6 +870,18 @@ class ImprovedMARLAgent:
         # Decay exploration rate
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+            
+        if selected_action and selected_action.get("type") == "move":
+            target_city = selected_action.get("target_city")
+            if target_city:
+                player_id = player.id
+                if player_id not in self.movement_history:
+                    self.movement_history[player_id] = []
+                    
+                self.movement_history[player_id].append(target_city.name)
+                
+                if len(self.movement_history[player_id]) > 8:
+                    self.movement_history[player_id] = self.movement_history[player_id][-8:]
         
         # Log action for analysis
         self._log_action(selected_action, reward)
@@ -881,11 +912,12 @@ class ImprovedMARLAgent:
         
         # MOVE actions (standard movement to adjacent cities)
         for neighbor in player.city.neighbours:
-            actions.append({
-                "type": "move",
-                "target_city": neighbor,
-                "method": "standard"
-            })
+            if neighbor != player.city:
+                actions.append({
+                    "type": "move",
+                    "target_city": neighbor,
+                    "method": "standard"
+                })
         
         # Direct flight (using city cards)
         for card in player.hand:
@@ -1005,7 +1037,7 @@ class ImprovedMARLAgent:
             method = action.get("method", "standard")
             card = action.get("card")
             
-            if target_city:
+            if target_city and target_city.name != player_copy.city.name:
                 # Find corresponding city in the simulation copy
                 target_city_copy = next((city for city in sim_copy.cities if city.name == target_city.name), None)
                 
@@ -1122,7 +1154,8 @@ class ImprovedMARLAgent:
             "epsilon": self.epsilon,
             "total_train_steps": self.total_train_steps,
             "rewards_history": self.rewards_history,
-            "action_stats": self.action_stats
+            "action_stats": self.action_stats,
+            "movement_history": self.movement_history
         }
         
         torch.save(save_data, filepath)
@@ -1141,6 +1174,7 @@ class ImprovedMARLAgent:
                 self.total_train_steps = save_data.get("total_train_steps", 0)
                 self.rewards_history = save_data.get("rewards_history", [])
                 self.action_stats = save_data.get("action_stats", {})
+                self.movement_history = save_data.get("movement_history", {})
                 
                 print(f"Loaded MARL state from {filepath}")
                 return True

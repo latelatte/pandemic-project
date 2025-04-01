@@ -39,10 +39,11 @@ class ImprovedMCTSNode:
         if player and player.city:
             # Move actions
             for neighbor in player.city.neighbours:
-                actions.append({
-                    "type": "move", 
-                    "target_city": neighbor
-                })
+                if neighbor != player.city:
+                    actions.append({
+                        "type": "move", 
+                        "target_city": neighbor
+                    })
             
             # Treat action
             if player.city.infection_level > 0:
@@ -102,7 +103,8 @@ class ImprovedMCTSNode:
             
             # Pass action
             actions.append({
-                "type": "pass"
+                "type": "pass",
+                "base_value": 0.01
             })
         
         return actions
@@ -181,7 +183,7 @@ class ImprovedMCTSNode:
         
         if action_type == "move":
             target_city = action.get("target_city")
-            if target_city:
+            if target_city and (target_city.name != player.city.name):
                 # Find corresponding city in the state
                 for city in new_state.get("cities", []):
                     if city.name == target_city.name:
@@ -432,8 +434,17 @@ class ImprovedMCTSNode:
         
         return max(0.0, min(1.0, score))
     
-    def rollout_policy(self, state, depth=0, max_depth=10):
+    def rollout_policy(self, state, depth=0, max_depth=10, visited_states=None):
         """Enhanced rollout policy with strategic heuristics"""
+        if visited_states is None:
+            visited_states = set()
+            
+        state_hash = hash(str(state))
+        if state_hash in visited_states:
+            return self._evaluate_strategic_value() * 0.7
+        
+        visited_states.add(state_hash)
+        
         if depth >= max_depth or state.get("game_over", False):
             return self._evaluate_strategic_value()
             
@@ -592,8 +603,8 @@ class ImprovedMCTSAgent:
     Enhanced Monte Carlo Tree Search agent for Pandemic with strategic heuristics
     and collaboration awareness.
     """
-    def __init__(self, name="MCTS", simulation_count=50, exploration_weight=1.4,
-                max_rollout_depth=6, time_limit=0.3, use_heuristics=True):
+    def __init__(self, name="MCTS", simulation_count=80, exploration_weight=1.4,
+                max_rollout_depth=7, time_limit=0.5, use_heuristics=True):
         self.name = name
         self.simulation_count = simulation_count
         self.exploration_weight = exploration_weight
@@ -601,18 +612,16 @@ class ImprovedMCTSAgent:
         self.max_time = time_limit
         self.use_heuristics = use_heuristics
         
-        # Tracking statistics
         self.node_cache = {}
         self.action_stats = {}
         self.visit_counts = {}
         self.value_sum = {}
         
-        # Game state tracking
         self.infection_hotspots = []
         self.team_strategy = {}
         self.cure_progress = defaultdict(float)
+        self.movement_history = {}
         
-        # Performance metrics
         self.last_simulation_count = 0
         self.thinking_time = 0
         self.total_simulations = 0
@@ -751,6 +760,24 @@ class ImprovedMCTSAgent:
         # Movement based on target
         elif action_type == "move":
             target_city = action.get("target_city")
+            player = node.state.get("current_player")
+            if target_city and player and player.city and target_city.name == player.city.name:
+                return -10.0
+            
+            if target_city and player and player.city:
+                if target_city.name == player.city.name:
+                    return -10.0
+                
+                if hasattr(player, 'id'):
+                    player_id = player.id
+                    if player_id in self.movement_history:
+                        recent_visits = self.movement_history[player_id]
+                        if target_city.name in recent_visits:
+                            visits = recent_visits.count(target_city.name)
+                            recency_penalty = sum(0.8 for i, city in enumerate(reversed(recent_visits))
+                                            if city == target_city.name and i < 3)
+                            bias -= (visits * 1.2 + recency_penalty)
+            
             if target_city:
                 # Moving to high infection city
                 if target_city.infection_level >= 3:
@@ -810,7 +837,7 @@ class ImprovedMCTSAgent:
         
         # Pass is generally poor
         elif action_type == "pass":
-            bias -= 0.2
+            bias -= 0.1
             
         player = node.state.get("current_player")
         if hasattr(player, 'role') and player.role:
@@ -1111,6 +1138,42 @@ class ImprovedMCTSAgent:
                 debug_log(f"ACTION: Sharing {card.city_name} card with {recipient.name}")
         else:
             debug_log(f"ACTION: {action_type}")
+        # print("===== MCTS ACTION DEBUG =====")
+        # print(f"Player: {player.name} at {player.city.name if player.city else 'None'}")
+        # if best_action.get("type") == "move":
+        #     target_city = best_action.get("target_city")
+        #     if target_city and player.city and target_city.name == player.city.name:
+        #         print(f"DEBUG: Selected move to: {target_city.name}")
+        #         print(f"DEBUG: Current city: {player.city.name}")
+        #         print(f"DEBUG: Same city check: {target_city.name == player.city.name}")
+                
+        #         if target_city.name == player.city.name:
+        #             print(f"Warning: MCTS tried moving to same city {player.city.name}, finding alternative action")
+                    
+        #             # インデントを修正し、代替アクションを実行
+        #             if player.city.infection_level > 0:
+        #                 best_action = {"type": "treat", "city": player.city}
+        #                 print(f"Choosing to treat infection in {player.city.name} instead")
+        #             elif player.city.neighbours:
+        #                 target = random.choice(player.city.neighbours)
+        #                 best_action = {"type": "move", "target_city": target}
+        #                 print(f"Choosing to move to {target.name} instead")
+        #             else:
+        #                 print("Choosing to pass the turn")
+        #                 best_action = {"type": "pass"}
+        # print(f"MCTS final action: {best_action.get('type')} to {best_action.get('target_city').name if best_action.get('type') == 'move' and best_action.get('target_city') else ''}")
+        
+        if best_action.get("type") == "move":
+            target_city = best_action.get("target_city")
+            if target_city:
+                player_id = player.id
+                if player_id not in self.movement_history:
+                    self.movement_history[player_id] = []
+                
+                self.movement_history[player_id].append(target_city.name)
+                
+                if len(self.movement_history[player_id]) > 8:
+                    self.movement_history[player_id] = self.movement_history[player_id][-8:]
         
         return best_action
     
@@ -1126,13 +1189,14 @@ class ImprovedMCTSAgent:
             "thinking_time": self.thinking_time,
             "total_simulations": self.total_simulations,
             "team_strategy": self.team_strategy,
-            "cure_progress": dict(self.cure_progress)
+            "cure_progress": dict(self.cure_progress),
+            "movement_history": self.movement_history
         }
         
         with open(filepath, "wb") as f:
             pickle.dump(save_data, f)
         print(f"MCTS agent state saved in {filepath}")
-    
+
     def load_state(self, filepath="mctsagent_state.pkl"):
         """Load agent state from file"""
         try:
@@ -1149,6 +1213,7 @@ class ImprovedMCTSAgent:
                 self.total_simulations = save_data.get("total_simulations", 0)
                 self.team_strategy = save_data.get("team_strategy", {})
                 loaded_cure_progress = save_data.get("cure_progress", {})
+                self.movement_history = save_data.get("movement_history", {})
                 
                 # Convert dictionary to defaultdict
                 self.cure_progress = defaultdict(float)

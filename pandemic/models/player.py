@@ -44,25 +44,30 @@ class Player:
         return self.strategy_func(player) 
 
     def perform_turn(self):
+        print(f"DEBUG: Entering perform_turn for {self.name}")
         remaining_actions = self.simulation.actions_per_turn
         print(f"--- {self.name}'s turn starting with {len(self.hand)} cards in hand ---")
         
         used_cards = set() 
         while remaining_actions > 0:
+            print(f"DEBUG: About to call strategy with {remaining_actions} actions left")
             available_hand = [card for card in self.hand if id(card) not in [id(c) for c in used_cards]]
             
             actual_hand = self.hand.copy()
             self.hand = available_hand
             
             action = self.strategy(self)
+            print(f"DEBUG: Strategy returned action type: {action.get('type') if action else 'None'}")
             
             self.hand = actual_hand
             
             if not action:
                 break
             
-            self._execute_action(action)
-            remaining_actions -= 1
+            action_result = self._execute_action(action)
+            
+            if action_result is not False:
+                remaining_actions -= 1
             
             if action["type"] == "move" and action.get("method") in ["direct_flight", "charter_flight"]:
                 card = action.get("card")
@@ -90,22 +95,17 @@ class Player:
                 else:
                     print(f"ERROR: Not enough valid cards for cure discovery")
                     action = {"type": "pass"} 
-            
-
-            self._execute_action(action)
-            remaining_actions -= 1
 
 
     def _execute_action(self, action):
-        """
-        アクションを適切なメソッド呼び出しに委譲する
-        """
         action_type = action.get("type")
         
         if action_type == "move":
             target_city = action.get("target_city")
-            if target_city:
-                self.move_to(target_city)
+            if target_city and target_city.name == self.city.name:
+                print(f"Warning: Prevented move to same city {self.city.name}")
+                return False
+            return self.move_to(target_city)
         
         elif action_type == "treat":
             city = action.get("city", self.city)
@@ -129,7 +129,7 @@ class Player:
                 if direction == "give":
                     target_player.hand.append(card)
                     print(f"{self.name} gave {card} to {target_player.name}")
-                else:  # take
+                else: 
                     self.hand.append(card)
                     print(f"{self.name} took {card} from {target_player.name}")
         
