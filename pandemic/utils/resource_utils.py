@@ -11,9 +11,23 @@ import numpy as np
 class ResourceMonitor:
     """resources usage monitor for agents"""
     
-    def __init__(self):
-        self.process = psutil.Process(os.getpid())
-        self.measurements = {}
+    _instance = None
+    """Singleton instance of ResourceMonitor"""
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ResourceMonitor, cls).__new__(cls)
+            cls._instance.process = psutil.Process(os.getpid())
+            cls._instance.measurements = {}
+        
+        known_agents = ["MCTSAgent", "EAAgent", "MARLAgent"]
+        for agent in known_agents:
+            cls._instance.measurements[agent] = {
+                'memory': [],
+                'cpu_percent': [],
+                'timestamps': []
+            }
+        return cls._instance
         
     def start_measurement(self, agent_name):
         if agent_name not in self.measurements:
@@ -57,11 +71,19 @@ class ResourceMonitor:
     
     def get_agent_summary(self, agent_name):
         if agent_name not in self.measurements:
+            print(f"{agent_name}が見つからないからNone!")
             return None
             
         data = self.measurements[agent_name]
-        
-        if not data['memory'] or not data['cpu_percent'] or not data['timestamps']:
+    
+        if not data['memory']:
+            print(f"memoryのデータがないからNone!")
+            return None
+        elif not data['cpu_percent']:
+            print(f"cpuのデータがないからNone!")
+            return None
+        elif not data['timestamps']:
+            print(f"timestampがないからNone!")
             return None
             
         # Filter out any anomalous zero memory readings

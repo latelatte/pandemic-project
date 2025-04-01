@@ -47,9 +47,9 @@ def load_dual_evaluation_data(eval_dir):
         dict: Processed evaluation data
     """
     # Find the latest evaluation report
-    report_files = glob.glob(os.path.join(eval_dir, "evaluation_report_*.json"))
+    report_files = glob.glob(os.path.join(eval_dir, "*evaluation_report_*.json"))
     if not report_files:
-        print("No evaluation reports found.")
+        print("No evaluation reports to analyze CNP found.")
         return None
         
     latest_report = max(report_files, key=os.path.getctime)
