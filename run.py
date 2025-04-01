@@ -32,6 +32,9 @@ from pandemic.agents.mcts_agent import mcts_agent_strategy
 from pandemic.agents.ea_agent import ea_agent_strategy
 from pandemic.agents.marl_agent import marl_agent_strategy
 
+from visualization.cnp_analysis import run_analysis
+from visualization.pareto_analysis import run_pareto_analysis
+
 
 class ConvergenceDetector:
     """
@@ -247,9 +250,9 @@ class IntegratedEvaluationFramework:
         self.fixed_resource_results = {}
         
         # Default settings
-        self.default_episodes = 5000
-        self.default_resource_time = 24 * 60 * 60  # 24 hours in seconds
-        self.eval_episodes = 1000
+        self.default_episodes = 1 # 5000 episodes #*デバッグ用に変更してます
+        self.default_resource_time = 30  # 12 hours #*デバッグ用に
+        self.eval_episodes = 1 # 1000 episodes #*デバッグ用に変更してます
         
         # Load settings file
         self.settings = self._load_evaluation_config()
@@ -266,10 +269,10 @@ class IntegratedEvaluationFramework:
             "fixed_episodes": self.default_episodes,
             "fixed_resource_time": self.default_resource_time,
             "eval_episodes": self.eval_episodes,
-            "convergence_max_episodes": 50000,
-            "convergence_max_time": 72 * 60 * 60,  # 72 hours
+            "convergence_max_episodes": 1, # 50000 episodes #*変更しています
+            "convergence_max_time": 30,  # 48 hours #*変更しています
             "convergence_window": 100,
-            "convergence_threshold": 0.02,
+            "convergence_threshold": 0.05, # 0.02 #*変更しています
             "convergence_stability": 3,
             "num_players": 4,
             "difficulty": "normal",
@@ -423,7 +426,7 @@ class IntegratedEvaluationFramework:
             
             # If using converged agents, copy state files
             if use_converged and converged_dir:
-                agent_file = f"{strategy_name.lower()}_agent_state.{'pt' if 'MARL' in strategy_name else 'pkl'}"
+                agent_file = f"{strategy_name.lower()}_state.{'pt' if 'MARL' in strategy_name else 'pkl'}"
                 source_path = os.path.join(converged_dir, agent_file)
                 target_path = os.path.join("./agents_state", agent_file)
                 
@@ -439,9 +442,10 @@ class IntegratedEvaluationFramework:
                 n_episodes=episodes,
                 log_dir=strategy_dir,
                 num_players=self.settings["num_players"],
-                difficulty=self.settings["difficulty"]
+                difficulty=self.settings["difficulty"],
             )
             metrics = runner.run_experiments([(strategy_func, strategy_name)], config_dir=self.config_dir)
+            print(f"デバッグ：resource monitorに渡してる引数はこれ！ → {strategy_name}")
             
             # Add resource usage information
             if "resource_usage" not in metrics:
@@ -515,7 +519,7 @@ class IntegratedEvaluationFramework:
             
             # If using converged agents, copy state files
             if use_converged and converged_dir:
-                agent_file = f"{strategy_name.lower()}_agent_state.{'pt' if 'MARL' in strategy_name else 'pkl'}"
+                agent_file = f"{strategy_name.lower()}_state.{'pt' if 'MARL' in strategy_name else 'pkl'}"
                 source_path = os.path.join(converged_dir, agent_file)
                 target_path = os.path.join("./agents_state", agent_file)
                 
@@ -682,17 +686,12 @@ class IntegratedEvaluationFramework:
         converged_agents_dir = os.path.join(self.log_dir, "converged_agents")
         os.makedirs(converged_agents_dir, exist_ok=True)
         
-        for agent_name, results in convergence_results.items():
-            # Copy agent state files to converged_agents directory
-            agent_file = f"{agent_name.lower()}_agent_state.{'pt' if 'MARL' in agent_name else 'pkl'}"
-            source_path = os.path.join("./agents_state", agent_file)
-            target_path = os.path.join(converged_agents_dir, agent_file)
-            
-            if os.path.exists(source_path):
+        for file in os.listdir("./agents_state"):
+            if "_state." in file:
+                source_path = os.path.join("./agents_state", file)
+                target_path = os.path.join(converged_agents_dir, file)
                 shutil.copy(source_path, target_path)
-                print(f"Saved converged agent state for {agent_name} to {target_path}")
-            else:
-                print(f"Warning: Could not find agent state at {source_path}")
+
         
         # Step 3: Evaluate converged agents with fixed episodes
         print("\n----- Evaluating Converged Agents with Fixed Episodes -----")
@@ -922,14 +921,10 @@ class IntegratedEvaluationFramework:
         
         print(f"\nIntegrated evaluation report saved to: {output_file}")
         
-        # Trigger visualization if available
-        try:
-            from visualization.cnp_analysis import run_cnp_analysis
-            visualization_dir = os.path.join(self.log_dir, f"visualizations_{timestamp}")
-            run_cnp_analysis(self.log_dir, visualization_dir)
-            print(f"Visualizations created in: {visualization_dir}")
-        except ImportError:
-            print("Visualization module not available. Skipping visualization generation.")
+        #* create visualizations
+        visualization_dir = os.path.join(self.log_dir, f"visualizations_{timestamp}")
+        run_analysis(self.log_dir, visualization_dir)
+        run_pareto_analysis(self.log_dir, visualization_dir)
         
         return output_file
 
@@ -942,7 +937,7 @@ def parse_args():
                         choices=['integrated', 'convergence', 'fixed-episodes', 'fixed-resource'],
                         help='Evaluation mode (default: integrated)')
     
-    parser.add_argument('--agents', nargs='+', default=['random', 'mcts', 'ea', 'marl'],
+    parser.add_argument('--agents', nargs='+', default=['mcts', 'ea', 'marl'],
                        choices=['random', 'mcts', 'ea', 'marl'],
                        help='List of agent strategies to evaluate (default: all)')
     
@@ -962,7 +957,7 @@ def parse_args():
 def get_agent_strategies(agent_names):
     """Get strategy tuples for the specified agents"""
     agent_map = {
-        'random': (random_agent_strategy, "RandomAgent"),
+        # 'random': (random_agent_strategy, "RandomAgent"),
         'mcts': (mcts_agent_strategy, "MCTSAgent"),
         'ea': (ea_agent_strategy, "EAAgent"),
         'marl': (marl_agent_strategy, "MARLAgent")

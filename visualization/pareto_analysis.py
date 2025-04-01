@@ -37,7 +37,7 @@ def load_agent_data(results_dir):
         print(f"error: {e}")
         return None
 
-def aggregate_experiment_data(results_dir="./logs", n_latest=5, pattern="experiment_*"):
+def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="experiment_*"):
     """create a DataFrame from multiple experiment directories"""
     if os.path.isdir(results_dir) and not results_dir.endswith("logs"):
         experiment_dirs = [results_dir]
@@ -50,8 +50,8 @@ def aggregate_experiment_data(results_dir="./logs", n_latest=5, pattern="experim
     all_agent_data = {}
     
     for exp_dir in experiment_dirs:
-        metrics_file = os.path.join(exp_dir, "metrics.json")
-        if not os.path.exists(metrics_file):
+        metrics_file = glob.glob(os.path.join(results_dir, "./evaluations/*.json"))
+        if not metrics_file:
             print(f"WARN: {metrics_file} not found.")
             continue
             
@@ -824,37 +824,107 @@ def create_all_gpu_visualizations(data, output_dir="./gpu_visualizations"):
     print(f"All GPU-enhanced visualizations created in: {output_dir}")
     return df
 
-def run_pareto_analysis(results_dir, output_dir=None, n_latest=5):
-    if output_dir is None:
-        output_dir = os.path.join(os.path.dirname(results_dir) if os.path.isdir(results_dir) else results_dir, "plots")
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-
-    print(f"accumulating latest{n_latest} files...")
-    df = aggregate_experiment_data(results_dir, n_latest)
-    
-    if df is None or df.empty:
-        print("not found experiment data")
+def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5):
+    report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
+    if not report_files:
+        print("No integrated evaluation report found.")
         return False
     
-    print(f"Agengts: {', '.join(df['Agent'].unique())}")
-    print(f"number of samples: {df['n_samples'].iloc[0]} experiments")
+    latest_report = max(report_files, key=os.path.getctime)
     
-    # for 2D Pareto analysis
-    print("createing 2D pareto analysis...")
+    adapted_dir = os.path.join(evaluation_dir, "adapted_data")
+    metrics_path = convert_integrated_report_for_pareto(latest_report, adapted_dir)
+    
+    with open(metrics_path, 'r') as f:
+        metrics_data = json.load(f)
+    
+    agent_data = []
+    for agent_name, metrics in metrics_data.get("agent_performance", {}).items():
+        resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
+        agent_data.append({
+            "Agent": agent_name,
+            "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+            "Avg Time (ms)": metrics.get("avg_time_ms", 0),
+            "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
+            "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
+            "n_samples": 1 
+        })
+    
+    df = pd.DataFrame(agent_data)
+    
+    if output_dir is None:
+        output_dir = os.path.join(evaluation_dir, "analysis")
+
     create_2d_pareto_analysis(df, output_dir)
-    
-    # for 3D visualization
-    print("creating 3D visualization...")
     create_3d_visualization(df, output_dir)
-    
-    # for radar chart
-    print("creating radar chart...")
     create_radar_chart(df, output_dir)
-    
-    print(f"pareto analysis completed: {output_dir}")
+    # create_cnp_comparison_chart(df, output_dir)
+    # create_gpu_impact_visualization(df, output_dir)
+    # create_gpu_pareto_chart(df, output_dir)
+    # create_gpu_enhanced_radar_chart(df, output_dir)
+    print(f"Pareto analysis completed. Visualizations saved to: {output_dir}")
     return True
+
+
+def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./adaptedData"):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with open(integrated_report_path, 'r') as f:
+        report = json.load(f)
+    
+    fixed_episodes = report.get("fixed_episodes_results", {})
+    fixed_resources = report.get("fixed_resource_results", {})
+    
+    metrics = {"agent_performance": {}, "resource_usage": {}}
+    
+    for agent_name, data in fixed_episodes.items():
+        metrics["agent_performance"][agent_name] = data.get("agent_performance", {}).get(agent_name, {})
+        metrics["resource_usage"][agent_name] = data.get("resource_usage", {}).get(agent_name, {})
+        
+    metrics_path = os.path.join(output_dir, "metrics.json")
+    with open(metrics_path, 'w') as f:
+        json.dump(metrics, f, indent=2)
+
+    return metrics_path
+
+def run_adapted_pareto_analysis(evaluation_dir="./evaluations"):
+    report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
+    if not report_files:
+        print("No integrated evaluation report found.")
+        return False
+    
+    latest_report = max(report_files, key=os.path.getctime)
+    
+    adapted_dir = os.path.join(evaluation_dir, "adapted_data")
+    metrics_path = convert_integrated_report_for_pareto(latest_report, adapted_dir)
+    
+    with open(metrics_path, 'r') as f:
+        metrics_data = json.load(f)
+    
+    agent_data = []
+    for agent_name, metrics in metrics_data.get("agent_performance", {}).items():
+        resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
+        agent_data.append({
+            "Agent": agent_name,
+            "Win Rate (%)": metrics.get("win_contribution", 0) * 100,
+            "Avg Time (ms)": metrics.get("avg_time_ms", 0),
+            "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
+            "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
+            "n_samples": 1 
+        })
+    
+    df = pd.DataFrame(agent_data)
+    
+    output_dir = os.path.join(evaluation_dir, "pareto_plots")
+    create_2d_pareto_analysis(df, output_dir)
+    create_3d_visualization(df, output_dir)
+    create_radar_chart(df, output_dir)
+    # create_cnp_comparison_chart(df, output_dir)
+    # create_gpu_impact_visualization(df, output_dir)
+    # create_gpu_pareto_chart(df, output_dir)
+    # create_gpu_enhanced_radar_chart(df, output_dir)
+    return True
+
 
 if __name__ == "__main__":
     import sys
@@ -867,7 +937,7 @@ if __name__ == "__main__":
     
     import argparse
     parser = argparse.ArgumentParser(description='pareto analysis')
-    parser.add_argument('--dir', type=str, default="./logs", help='target experiment directory (デフォルト: ../logs)')
+    parser.add_argument('--dir', type=str, default="./evaluations", help='target experiment directory (デフォルト: ../logs)')
     parser.add_argument('--n_latest', type=int, default=5, help='number of latest experiments to analyze (デフォルト: 5)')
     parser.add_argument('--output', type=str, default="./plots", help='output directory for plots (デフォルト: ./plots)')
     
@@ -878,6 +948,4 @@ if __name__ == "__main__":
         print("not found experiment directory")
         sys.exit(1)
     
-    print(f"target: {results_dir}")
     success = run_pareto_analysis(results_dir, args.output, args.n_latest)
-    print("done" if success else "failed")
