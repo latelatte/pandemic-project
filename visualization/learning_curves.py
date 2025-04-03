@@ -90,3 +90,8 @@ def create_learning_curves(logs_dir, output_dir=None):
     
     print(f"learning curves saved to {output_dir}.")
     return True
+
+if __name__ == "__main__":
+    logs_dir = "./evaluation"
+    output_dir = "./plots"
+    create_learning_curves(logs_dir, output_dir)

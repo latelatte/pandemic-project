@@ -122,6 +122,20 @@ class ResourceMonitor:
         
         return summary
         
+    def get_current_memory_usage(self, agent_name):
+        if agent_name not in self.measurements or not self.measurements[agent_name]['memory']:
+            return 0.1
+            
+        recent_memory = self.measurements[agent_name]['memory'][-10:]
+        if not recent_memory:
+            return 0.1
+        
+        filtered_memory = [m for m in recent_memory if m > 0.05]
+        if not filtered_memory:
+            filtered_memory = recent_memory
+            
+        return sum(filtered_memory) / len(filtered_memory)
+    
     def print_stats(self):
         """display the resource usage statistics"""
         print("\n== resouce used ==")

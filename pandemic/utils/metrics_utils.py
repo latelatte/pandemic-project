@@ -57,6 +57,25 @@ class MetricsCollector:
         """records the number of treatments performed by an agent"""
         self.metrics['treatment_counts'][agent_name] += count
     
+    def get_agent_current_stats(self, agent_name):
+        if agent_name not in self.agent_stats:
+            return {"avg_time_ms": 0.0, "win_rates": 0, "treatments": 0, "avg_turns": 0, "avg_outbreaks": 0}
+            
+        stats = self.agent_stats[agent_name]
+        calls = max(1, stats.get("calls", 0))
+        avg_time = stats.get("total_time", 0) / calls
+        
+        recent_turns = self.metrics['total_turns'][-20:] if self.metrics['total_turns'] else [0]
+        recent_outbreaks = self.metrics['outbreak_counts'][-20:] if self.metrics['outbreak_counts'] else [0]
+        
+        return {
+            "avg_time_ms": float(avg_time * 1000.0),
+            "win_rates": stats.get("win_rates", 0),
+            "treatments": stats.get("treatments", 0),
+            "avg_turns": float(np.mean(recent_turns)),
+            "avg_outbreaks": float(np.mean(recent_outbreaks))
+        }
+    
     def get_summary(self):
         summary = {
             'avg_turns': 0.0,

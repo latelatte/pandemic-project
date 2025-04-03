@@ -19,6 +19,7 @@ import math
 import numpy as n
 import shutil
 import argparse
+from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pandemic.simulation.pandemic import PandemicSimulation
@@ -145,6 +146,19 @@ class ConvergenceSimulationRunner(SimulationRunner):
         agent_names = [name for _, name in strategies]
         self.metrics = MetricsCollector(agent_names)
         
+        tb_log_dir = os.path.join(self.log_dir, "tensorboard")
+        os.makedirs(tb_log_dir, exist_ok=True)
+        writer = SummaryWriter(log_dir=tb_log_dir)
+        
+        learning_curve = {
+            "episodes": [],
+            "win_rates": [],
+            "avg_times_ms": [],
+            "memory_usage_mb": []
+        }
+        
+        win_history = deque(maxlen=150)
+        
         for ep in range(self.n_episodes):
             # Check time limit
             if time.time() - self.start_time > self.max_time:
@@ -172,18 +186,42 @@ class ConvergenceSimulationRunner(SimulationRunner):
                 print(f"Episode {ep+1}: LOSE.")
                 self.losses += 1
             
+            win_history.append(1 if win else 0)
+            current_win_rate = sum(win_history) / len(win_history)
+            
             self.metrics.record_game_metrics(sim, win)
             
-            # Update convergence detector if available
+            agent_name = strategies[0][1]
+            
+            current_perf = self.metrics.get_agent_current_stats(agent_name)
+            current_memory = self.resource_monitor.get_current_memory_usage(agent_name)
+            
+            writer.add_scalar(f"{agent_name}/win_rate", current_win_rate, ep)
+            writer.add_scalar(f"{agent_name}/avg_time_ms", current_perf.get("avg_time_ms", 0), ep)
+            writer.add_scalar(f"{agent_name}/avg_memory_mb", current_memory, ep)
+            writer.add_scalar(f"{agent_name}/avg_turns", current_perf.get("avg_turns", 0), ep)
+            writer.add_scalar(f"{agent_name}/avg_outbreaks", current_perf.get("avg_outbreaks", 0), ep)
+            
+            if ep % 10 == 0 or ep < 100:  # 初期は密に、その後は間引いて記録
+                learning_curve["episodes"].append(ep)
+                learning_curve["win_rates"].append(current_win_rate)
+                learning_curve["avg_times_ms"].append(current_perf.get("avg_time_ms", 0))
+                learning_curve["memory_usage_mb"].append(current_memory)
+            
             if self.convergence_detector and self.convergence_detector.update(win, ep):
                 print(f"Convergence detected at episode {ep+1}!")
-                # Optionally terminate early
+                writer.add_text("convergence", f"Detected at episode {ep+1}", ep)
                 break
             
-            # Periodically evaluate progress
+            # 定期的に進捗評価
             if ep % 100 == 0 and ep > 0:
                 self.evaluate_agent_progress(ep)
-        
+                print(f"Episode {ep}: Win Rate = {current_win_rate:.4f}")
+            
+            writer.close()
+            
+            with open(os.path.join(self.log_dir, "learning_curve.json"), 'w') as f:json.dump(learning_curve, f, indent=2)
+            
         # Prepare metrics data
         metrics_summary = self.metrics.get_summary()
         resource_summary = self.resource_monitor.get_summary()
@@ -194,7 +232,8 @@ class ConvergenceSimulationRunner(SimulationRunner):
             "avg_turns": metrics_summary["avg_turns"],
             "avg_outbreaks": metrics_summary["avg_outbreaks"],
             "agent_performance": metrics_summary["agent_performance"],
-            "resource_usage": resource_summary
+            "resource_usage": resource_summary,
+            "learning_curve": learning_curve
         }
         
         return metrics_data
@@ -622,6 +661,11 @@ class IntegratedEvaluationFramework:
                                           config_dir=config_dir, 
                                           num_players=self.num_players,
                                           difficulty=self.difficulty)
+                    
+                    for p in sim.players:
+                        original_func = p.strategy_func
+                        strategy_name = p.strategy_name
+                        p.strategy_func = self.make_timed_strategy(original_func, strategy_name)
                     
                     # Run episode and collect metrics
                     sim.run_game()
