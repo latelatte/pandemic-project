@@ -585,6 +585,9 @@ class IntegratedEvaluationFramework:
             memory_mb = agent_metrics.get("resource_usage", {}).get(strategy_name, {}).get("avg_memory_mb", 0)
             episodes_completed = agent_metrics.get("total_episodes", 0)
             
+            if "total_episodes" not in results[strategy_name]:
+                results[strategy_name]["total_episodes"] = episodes_completed
+            
             print(f"  Win Rate: {win_rate:.2f}%")
             print(f"  Episodes Completed: {episodes_completed}")
             print(f"  Avg Decision Time: {avg_time:.2f} ms")
