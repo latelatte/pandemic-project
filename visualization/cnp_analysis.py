@@ -442,22 +442,67 @@ def create_cnp_visualization(data, output_dir):
     
     df["Time Efficiency"] = df["Win Rate (%)"] / df["Avg Time (ms)"]
     
-    for agent in unique_agents:
+    # Time Efficiencyグラフを対数スケールに変更し、全エージェントを表示
+    ax_time.set_yscale('log')  # 対数スケールを適用
+    
+    # エージェントごとにグループ化して横並びに表示するよう調整
+    n_agents = len(unique_agents)
+    group_width = 0.8  # グループの全体幅
+    bar_width = group_width / (2 * n_agents)  # 各バーの幅（2は評価タイプの数）
+    
+    # エージェントの表示位置を決定するオフセット
+    time_offsets = {}
+    
+    for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
         
-        for eval_type in ["Fixed Episodes", "Fixed Resource"]:
+        # 各エージェントデータの平均時間を計算して基準位置を求める
+        if not agent_data.empty:
+            time_val = agent_data["Avg Time (ms)"].mean()
+            time_offsets[agent] = time_val
+    
+    # 固定エピソードと固定リソースを横並びに表示
+    for i, agent in enumerate(unique_agents):
+        agent_data = df[df["Agent"] == agent]
+        
+        for j, eval_type in enumerate(["Fixed Episodes", "Fixed Resource"]):
             eval_data = agent_data[agent_data["Evaluation"] == eval_type]
             
             if not eval_data.empty:
-                ax_time.bar(
-                    eval_data["Avg Time (ms)"].iloc[0],
-                    eval_data["Time Efficiency"].iloc[0],
-                    width=eval_data["Avg Time (ms)"].iloc[0] * 0.3,
+                # 基準位置からオフセットを計算
+                time_val = time_offsets[agent]
+                # 評価タイプによって左右にずらす
+                offset = 0.7 if j == 0 else 1.3
+                
+                # 対数スケールなので値が0の場合に備える
+                efficiency = max(eval_data["Time Efficiency"].iloc[0], 1e-10)
+                
+                bar = ax_time.bar(
+                    time_val * offset,
+                    efficiency,
+                    width=time_val * 0.2,
                     color=color_map[agent],
-                    alpha=0.7 if eval_type == "Fixed Episodes" else 0.4
+                    alpha=0.7 if eval_type == "Fixed Episodes" else 0.4,
+                    label=f"{agent} ({eval_type})" if i == 0 else None
+                )
+                
+                # バーの上にエージェント名を表示
+                ax_time.text(
+                    time_val * offset,
+                    efficiency * 1.1,
+                    agent,
+                    ha='center',
+                    va='bottom',
+                    fontsize=7,
+                    rotation=45
                 )
     
-    ax_time.set_ylabel("Time Efficiency\n(Win Rate / Time)", fontsize=10)
+    # 凡例の追加
+    handles, labels = ax_time.get_legend_handles_labels()
+    if handles:
+        ax_time.legend(handles[:2], labels[:2], loc='upper right', fontsize=8)
+    
+    ax_time.set_ylabel("Time Efficiency\n(Win Rate / Time) - log scale", fontsize=10)
     ax_time.set_xscale('log')
     ax_time.grid(True, axis='y', linestyle='--', alpha=0.5)
     ax_time.tick_params(axis='x', labelsize=0)

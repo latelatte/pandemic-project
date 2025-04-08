@@ -50,10 +50,19 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
     all_agent_data = {}
     
     for exp_dir in experiment_dirs:
-        metrics_file = glob.glob(os.path.join(results_dir, "./evaluations/*.json"))
-        if not metrics_file:
-            print(f"WARN: {metrics_file} not found.")
+        # パスの構築を修正：正確なJSONファイルのパスを取得
+        metrics_files = glob.glob(os.path.join(exp_dir, "*.json"))
+        if not metrics_files:
+            # 評価ディレクトリ内を探す
+            metrics_files = glob.glob(os.path.join(exp_dir, "evaluations", "*.json"))
+            
+        if not metrics_files:
+            print(f"WARN: No JSON metrics files found in {exp_dir}")
             continue
+            
+        # 最新のメトリクスファイルを使用
+        metrics_file = max(metrics_files, key=os.path.getctime)
+        print(f"Processing metrics file: {metrics_file}")
             
         try:
             with open(metrics_file, 'r') as f:
@@ -71,13 +80,15 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
                 memory = resource_usage.get("avg_memory_mb", 0)
                 cpu = resource_usage.get("avg_cpu_percent", 0)
                 
+                print(f"Agent: {agent_name}, Memory: {memory}, Source: {metrics_file}")
+                
                 all_agent_data[agent_name]["win_rates"].append(win_rate)
                 all_agent_data[agent_name]["times"].append(avg_time)
                 all_agent_data[agent_name]["memory"].append(memory)
                 all_agent_data[agent_name]["cpu"].append(cpu)
                 
         except Exception as e:
-            print(f"error occured in processing on {metrics_file} : {e}")
+            print(f"Error occurred in processing {metrics_file}: {e}")
     
     # convert to DataFrame
     aggregated_data = []
@@ -115,7 +126,7 @@ def compute_pareto_frontier(points):
     return sorted(pareto_points, key=lambda x: x[0])
 
 def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, output_dir, 
-                          size_col=None, minimize_x=True, maximize_y=True):
+                          size_col=None, minimize_x=True, maximize_y=True, show_size_values=False):
     """for 2D Pareto chart"""
     plt.figure(figsize=(12, 8))
     
@@ -179,7 +190,8 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
             alpha=0.9
         )
         
-        if size_col:
+        # サイズ情報の表示をオプションに基づいて制御
+        if size_col and show_size_values:
             value_text = f"{size_col}: {row[size_col]:.1f}"
             plt.annotate(
                 value_text,
@@ -197,32 +209,6 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
     
     arrow_x_pos = min_x + (max_x - min_x) * 0.05
     arrow_y_pos = min_y + (max_y - min_y) * 0.95
-    
-    #*最大最小については必要そうならラベル表示してもいいかも
-    # if minimize_x:
-    #     plt.annotate('', xy=(arrow_x_pos, arrow_y_pos), xytext=(arrow_x_pos + (max_x - min_x) * 0.1, arrow_y_pos),
-    #             arrowprops=dict(arrowstyle='<-', color='red'))
-    #     plt.text(arrow_x_pos + (max_x - min_x) * 0.05, arrow_y_pos - (max_y - min_y) * 0.03, 
-    #             'Minimize', ha='center', color='red')
-    # else:
-    #     plt.annotate('', xy=(arrow_x_pos + (max_x - min_x) * 0.1, arrow_y_pos), xytext=(arrow_x_pos, arrow_y_pos),
-    #             arrowprops=dict(arrowstyle='<-', color='green'))
-    #     plt.text(arrow_x_pos + (max_x - min_x) * 0.05, arrow_y_pos - (max_y - min_y) * 0.03, 
-    #             'Maximize', ha='center', color='green')
-    
-    # arrow_x_pos = min_x + (max_x - min_x) * 0.05
-    # arrow_y_pos = min_y + (max_y - min_y) * 0.05
-    
-    # if maximize_y:
-    #     plt.annotate('', xy=(arrow_x_pos, arrow_y_pos + (max_y - min_y) * 0.1), xytext=(arrow_x_pos, arrow_y_pos),
-    #             arrowprops=dict(arrowstyle='<-', color='green'))
-    #     plt.text(arrow_x_pos - (max_x - min_x) * 0.03, arrow_y_pos + (max_y - min_y) * 0.05, 
-    #             'Maximize', va='center', rotation=90, color='green')
-    # else:
-    #     plt.annotate('', xy=(arrow_x_pos, arrow_y_pos), xytext=(arrow_x_pos, arrow_y_pos + (max_y - min_y) * 0.1),
-    #             arrowprops=dict(arrowstyle='<-', color='red'))
-    #     plt.text(arrow_x_pos - (max_x - min_x) * 0.03, arrow_y_pos + (max_y - min_y) * 0.05, 
-    #             'Minimize', va='center', rotation=90, color='red')
     
     handles, labels = scatter.get_legend_handles_labels()
     agent_handles = []
@@ -258,7 +244,7 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
     plt.savefig(os.path.join(output_dir, filename), dpi=300)
     plt.close()
 
-def create_2d_pareto_analysis(df, output_dir):
+def create_2d_pareto_analysis(df, output_dir, show_size_values=False):
     """create 2D Pareto analysis charts"""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -266,10 +252,11 @@ def create_2d_pareto_analysis(df, output_dir):
         df, 
         "Avg Time (ms)", "Win Rate (%)",
         "Average Response Time (ms) - The smaller the better", "Win Rate (%) - The higher the better",
-        "Performance vs Win Rate Trade-off Analysis",
+        "Time vs Win Rate Trade-off Analysis",
         "pareto_time_winrate.png",
         output_dir,
-        "Memory (MB)"
+        "Memory (MB)",
+        show_size_values=show_size_values
     )
     
     create_2d_pareto_chart(
@@ -279,7 +266,8 @@ def create_2d_pareto_analysis(df, output_dir):
         "Memory vs Win Rate Trade-off Analysis",
         "pareto_memory_winrate.png",
         output_dir,
-        "Avg Time (ms)"
+        "Avg Time (ms)",
+        show_size_values=show_size_values
     )
 
 def create_3d_visualization(df, output_dir):
@@ -430,8 +418,13 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
         agent_perf = data.get("agent_performance", {}).get(agent_name, {})
         if agent_perf:
             metrics["agent_performance"][episodes_agent_name].update(agent_perf)
+        
+        # リソース使用量データの取得とデバッグ出力を追加
+        resource_data = data.get("resource_usage", {}).get(agent_name, {})
+        memory_value = resource_data.get("avg_memory_mb", 0)
+        print(f"Fixed Episodes - Agent: {agent_name}, Memory: {memory_value}")
             
-        metrics["resource_usage"][agent_name] = data.get("resource_usage", {}).get(agent_name, {})
+        metrics["resource_usage"][episodes_agent_name] = resource_data
         
     for agent_name, data in fixed_resources.items():
         resource_agent_name = f"{agent_name} (Fixed Resource)"
@@ -440,17 +433,28 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
         agent_perf = data.get("agent_performance", {}).get(agent_name, {})
         if agent_perf:
             metrics["agent_performance"][resource_agent_name].update(agent_perf)
+        
+        # リソース使用量データの取得とデバッグ出力を追加
+        resource_data = data.get("resource_usage", {}).get(agent_name, {})
+        memory_value = resource_data.get("avg_memory_mb", 0)
+        print(f"Fixed Resource - Agent: {agent_name}, Memory: {memory_value}")
             
-        metrics["resource_usage"][resource_agent_name] = data.get("resource_usage", {}).get(agent_name, {})
+        metrics["resource_usage"][resource_agent_name] = resource_data
 
         
     metrics_path = os.path.join(output_dir, "metrics.json")
     with open(metrics_path, 'w') as f:
         json.dump(metrics, f, indent=2)
+    
+    # メトリクスJSONの内容を確認するためのデバッグ出力
+    print(f"Generated metrics file: {metrics_path}")
+    print("Resource usage data sample:")
+    for agent, data in list(metrics["resource_usage"].items())[:2]:
+        print(f"  {agent}: {data}")
 
     return metrics_path
 
-def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5):
+def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5, show_size_values=False):
     report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
     if not report_files:
         print("No integrated evaluation report found.")
@@ -470,29 +474,35 @@ def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5):
         resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
         
         win_rate = metrics.get("win_rate", 0) * 100
-        print(f"Agent {agent_name}: Win rate = {win_rate}%")
+        avg_time = metrics.get("avg_time_ms", 0)
+        memory_mb = resource_usage.get("avg_memory_mb", 0)
+        
+        print(f"Agent {agent_name}: Win rate = {win_rate}%, Memory = {memory_mb} MB")
         
         agent_data.append({
             "Agent": agent_name,
             "Win Rate (%)": win_rate,
-            "Avg Time (ms)": metrics.get("avg_time_ms", 0),
-            "Memory (MB)": resource_usage.get("avg_memory_mb", 0),
+            "Avg Time (ms)": avg_time,
+            "Memory (MB)": memory_mb,
             "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
             "n_samples": 1 
         })
     
     df = pd.DataFrame(agent_data)
     
+    # メモリが0の場合、最小値を0.1に設定してグラフで見えるようにする
+    df.loc[df["Memory (MB)"] == 0, "Memory (MB)"] = 0.1
+    
     if output_dir is None:
         output_dir = os.path.join(evaluation_dir, "analysis")
 
-    create_2d_pareto_analysis(df, output_dir)
+    create_2d_pareto_analysis(df, output_dir, show_size_values)
     create_3d_visualization(df, output_dir)
     create_radar_chart(df, output_dir)
     print(f"Pareto analysis completed. Visualizations saved to: {output_dir}")
     return True
 
-def run_adapted_pareto_analysis(evaluation_dir="./evaluations"):
+def run_adapted_pareto_analysis(evaluation_dir="./evaluations", show_size_values=False):
     report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
     if not report_files:
         print("No integrated evaluation report found.")
@@ -521,7 +531,7 @@ def run_adapted_pareto_analysis(evaluation_dir="./evaluations"):
     df = pd.DataFrame(agent_data)
     
     output_dir = os.path.join(evaluation_dir, "pareto_plots")
-    create_2d_pareto_analysis(df, output_dir)
+    create_2d_pareto_analysis(df, output_dir, show_size_values)
     create_3d_visualization(df, output_dir)
     create_radar_chart(df, output_dir)
     return True
@@ -541,6 +551,7 @@ if __name__ == "__main__":
     parser.add_argument('--dir', type=str, default="./evaluations", help='target experiment directory')
     parser.add_argument('--n_latest', type=int, default=5, help='number of latest experiments to analyze')
     parser.add_argument('--output', type=str, default="./evaluations/analysis", help='output directory for plots')
+    parser.add_argument('--show-size-values', action='store_true', help='show additional metric values on plots')
     
     args = parser.parse_args()
     results_dir = args.dir if args.dir else find_latest_experiment()
@@ -549,4 +560,4 @@ if __name__ == "__main__":
         print("not found experiment directory")
         sys.exit(1)
     
-    success = run_pareto_analysis(results_dir, args.output, args.n_latest)
+    success = run_pareto_analysis(results_dir, args.output, args.n_latest, args.show_size_values)
