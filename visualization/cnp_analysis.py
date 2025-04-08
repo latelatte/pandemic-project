@@ -447,8 +447,6 @@ def create_cnp_visualization(data, output_dir):
     
     # エージェントごとにグループ化して横並びに表示するよう調整
     n_agents = len(unique_agents)
-    group_width = 0.8  # グループの全体幅
-    bar_width = group_width / (2 * n_agents)  # 各バーの幅（2は評価タイプの数）
     
     # エージェントの表示位置を決定するオフセット
     time_offsets = {}
@@ -460,6 +458,9 @@ def create_cnp_visualization(data, output_dir):
         if not agent_data.empty:
             time_val = agent_data["Avg Time (ms)"].mean()
             time_offsets[agent] = time_val
+    
+    # 全バーで使用する固定幅の計算（対数スケール上で適切に見えるサイズ）
+    fixed_width = 0.3  # 固定幅
     
     # 固定エピソードと固定リソースを横並びに表示
     for i, agent in enumerate(unique_agents):
@@ -480,28 +481,12 @@ def create_cnp_visualization(data, output_dir):
                 bar = ax_time.bar(
                     time_val * offset,
                     efficiency,
-                    width=time_val * 0.2,
+                    width=fixed_width * time_val,  # 幅は固定係数と時間の積
                     color=color_map[agent],
                     alpha=0.7 if eval_type == "Fixed Episodes" else 0.4,
                     label=f"{agent} ({eval_type})" if i == 0 else None
                 )
                 
-                # バーの上にエージェント名を表示
-                ax_time.text(
-                    time_val * offset,
-                    efficiency * 1.1,
-                    agent,
-                    ha='center',
-                    va='bottom',
-                    fontsize=7,
-                    rotation=45
-                )
-    
-    # 凡例の追加
-    handles, labels = ax_time.get_legend_handles_labels()
-    if handles:
-        ax_time.legend(handles[:2], labels[:2], loc='upper right', fontsize=8)
-    
     ax_time.set_ylabel("Time Efficiency\n(Win Rate / Time) - log scale", fontsize=10)
     ax_time.set_xscale('log')
     ax_time.grid(True, axis='y', linestyle='--', alpha=0.5)
@@ -511,17 +496,38 @@ def create_cnp_visualization(data, output_dir):
     
     df["Memory Efficiency"] = df["Win Rate (%)"] / df["Memory (MB)"]
     
-    for agent in unique_agents:
+    # Memory Efficiencyグラフを横並びに表示
+    # エージェントの表示位置を決定するオフセット
+    memory_offsets = {}
+    
+    for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
         
-        for eval_type in ["Fixed Episodes", "Fixed Resource"]:
+        # 各エージェントデータの平均メモリを計算して基準位置を求める
+        if not agent_data.empty:
+            memory_val = agent_data["Memory (MB)"].mean()
+            memory_offsets[agent] = memory_val
+    
+    # 固定エピソードと固定リソースを横並びに表示
+    for i, agent in enumerate(unique_agents):
+        agent_data = df[df["Agent"] == agent]
+        
+        for j, eval_type in enumerate(["Fixed Episodes", "Fixed Resource"]):
             eval_data = agent_data[agent_data["Evaluation"] == eval_type]
             
             if not eval_data.empty:
+                # 基準位置からオフセットを計算
+                memory_val = memory_offsets[agent]
+                # 評価タイプによって左右にずらす
+                offset = 0.7 if j == 0 else 1.3
+                
+                # 高さを固定値に設定
+                fixed_height = memory_val * 0.2
+                
                 ax_memory.barh(
-                    eval_data["Memory (MB)"].iloc[0],
+                    memory_val * offset,  # オフセットを適用して横並び
                     eval_data["Memory Efficiency"].iloc[0],
-                    height=eval_data["Memory (MB)"].iloc[0] * 0.3,
+                    height=fixed_height,
                     color=color_map[agent],
                     alpha=0.7 if eval_type == "Fixed Episodes" else 0.4
                 )
@@ -533,13 +539,12 @@ def create_cnp_visualization(data, output_dir):
     
     ax_legend = plt.subplot(gs[0, 1])
     ax_legend.axis('off')
-    
-    legend_y_start = 0.9
-    legend_y_step = 0.15
+
+    legend_y_start = 0.95
+    legend_y_step = 0.13 
     legend_x = 0.1
     
-    ax_legend.text(0.5, 1.0, "Legend", fontsize=12, fontweight='bold', ha='center')
-    
+
     ax_legend.text(0.5, legend_y_start, "Agents:", fontsize=10, fontweight='bold', ha='center')
     
     for i, agent in enumerate(unique_agents):
@@ -547,16 +552,19 @@ def create_cnp_visualization(data, output_dir):
         ax_legend.add_patch(Rectangle((legend_x, y_pos), 0.2, 0.1, color=color_map[agent]))
         ax_legend.text(legend_x + 0.25, y_pos + 0.05, agent, fontsize=9, va='center')
     
-    eval_y_start = legend_y_start - (len(unique_agents)+1.5)*legend_y_step
+    eval_y_start = legend_y_start - (len(unique_agents)+1)*legend_y_step
     ax_legend.text(0.5, eval_y_start, "Evaluation Types:", fontsize=10, fontweight='bold', ha='center')
     
+    # 評価方法の透明度の違いを明示する凡例
     fe_y = eval_y_start - legend_y_step
-    ax_legend.add_patch(Rectangle((legend_x, fe_y), 0.2, 0.1, color='gray', alpha=0.7))
+    ax_legend.add_patch(Rectangle((legend_x, fe_y), 0.2, 0.1, color=color_map[agent], alpha=0.7))
     ax_legend.text(legend_x + 0.25, fe_y + 0.05, "Fixed Episodes", fontsize=9, va='center')
     
     fr_y = eval_y_start - 2*legend_y_step
-    ax_legend.add_patch(Rectangle((legend_x, fr_y), 0.2, 0.1, color='gray', alpha=0.4))
+    ax_legend.add_patch(Rectangle((legend_x, fr_y), 0.2, 0.1, color=color_map[agent], alpha=0.4))
     ax_legend.text(legend_x + 0.25, fr_y + 0.05, "Fixed Resource", fontsize=9, va='center')
+    
+
     
     plt.suptitle("Multi-dimensional Efficiency Analysis", fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
