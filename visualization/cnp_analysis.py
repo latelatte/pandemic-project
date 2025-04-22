@@ -36,24 +36,30 @@ def calculate_cnp(win_rate, memory_gb, time_hrs):
     return win_rate / (memory_gb * time_hrs)
 
 
-def load_dual_evaluation_data(eval_dir):
+def load_dual_evaluation_data(eval_dir, report_file=None):
     """
     Load data from dual evaluation framework
     
     Args:
         eval_dir: Directory containing evaluation reports
+        report_file: Optional specific report file to load
         
     Returns:
         dict: Processed evaluation data
     """
-    # Find the latest evaluation report
-    report_files = glob.glob(os.path.join(eval_dir, "*evaluation_report_*.json"))
-    if not report_files:
-        print("No evaluation reports to analyze CNP found.")
-        return None
-        
-    latest_report = max(report_files, key=os.path.getctime)
-    print(f"Loading evaluation data from: {latest_report}")
+    # If a specific file is provided, use it; otherwise find the latest
+    if report_file:
+        latest_report = report_file
+        print(f"Loading specified evaluation data from: {latest_report}")
+    else:
+        # Find the latest evaluation report
+        report_files = glob.glob(os.path.join(eval_dir, "*evaluation_report_*.json"))
+        if not report_files:
+            print("No evaluation reports to analyze CNP found.")
+            return None
+            
+        latest_report = max(report_files, key=os.path.getctime)
+        print(f"Loading evaluation data from: {latest_report}")
     
     try:
         with open(latest_report, 'r') as f:
@@ -105,6 +111,389 @@ def load_dual_evaluation_data(eval_dir):
     except Exception as e:
         print(f"Error loading evaluation data: {e}")
         return None
+
+
+def find_project_root():
+    """
+    プロジェクトルートディレクトリを自動検出する
+    
+    Returns:
+        str: プロジェクトルートのパス
+    """
+    # 現在のスクリプトの絶対パス
+    current_path = os.path.abspath(__file__)
+    
+    # 現在のスクリプトのディレクトリ
+    current_dir = os.path.dirname(current_path)
+    
+    # 親ディレクトリ (おそらくプロジェクトルート)
+    parent_dir = os.path.dirname(current_dir)
+    
+    # プロジェクトルートの検証 (evaluationsディレクトリが存在するか確認)
+    if os.path.exists(os.path.join(parent_dir, "evaluations")):
+        print(f"Found project root: {parent_dir}")
+        return parent_dir
+    
+    # evaluationsが見つからない場合は、現在のディレクトリを返す (フォールバック)
+    print(f"Project root not detected. Using current directory: {current_dir}")
+    return current_dir
+
+
+def load_multiple_experiment_data(eval_dir, experiment_dirs=None):
+    """
+    Load data from multiple independent experiments
+    
+    Args:
+        eval_dir: Base directory containing experiment directories
+        experiment_dirs: List of specific experiment directories to load
+        
+    Returns:
+        list: List of processed evaluation data from each experiment
+    """
+    all_experiments_data = []
+    
+    # 相対パスが指定された場合はプロジェクトルートを考慮
+    if eval_dir.startswith('./') or eval_dir.startswith('../'):
+        project_root = find_project_root()
+        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
+        if eval_dir == './evaluations':
+            eval_dir = os.path.join(project_root, 'evaluations')
+            print(f"Using project root evaluations directory: {eval_dir}")
+    
+    # ディレクトリパスを絶対パスに変換して存在確認
+    eval_dir = os.path.abspath(eval_dir)
+    print(f"Using base directory: {eval_dir}")
+    
+    if not os.path.exists(eval_dir):
+        print(f"Error: Directory '{eval_dir}' does not exist.")
+        # カレントディレクトリの確認
+        current_dir = os.getcwd()
+        print(f"Current working directory: {current_dir}")
+        # サブディレクトリの一覧表示
+        if os.path.exists(os.path.dirname(eval_dir)):
+            parent_dir = os.path.dirname(eval_dir)
+            print(f"Contents of parent directory ({parent_dir}):")
+            for item in os.listdir(parent_dir):
+                print(f"  - {item}")
+        return []
+    
+    # リポジトリ内のすべての評価レポートを読み込む
+    all_report_files = []
+    
+    # ディレクトリ構造を探索
+    if experiment_dirs:
+        # 特定のディレクトリが指定された場合
+        for exp_dir_name in experiment_dirs:
+            exp_dir = os.path.join(eval_dir, exp_dir_name)
+            if os.path.exists(exp_dir) and os.path.isdir(exp_dir):
+                report_files = glob.glob(os.path.join(exp_dir, "*evaluation_report_*.json"))
+                # 統合済みファイルを除外しない（すべてのレポートを処理）
+                all_report_files.extend(report_files)
+    else:
+        # 自動探索モード - 直接ディレクトリ内のレポートを探す
+        report_files = glob.glob(os.path.join(eval_dir, "*evaluation_report_*.json"))
+        if report_files:
+            # レポートをタイムスタンプでソート
+            report_files = sorted(report_files, key=os.path.getctime)
+            all_report_files.extend(report_files)
+            print(f"Found {len(report_files)} evaluation reports directly in {eval_dir}")
+        
+        # サブディレクトリも探索
+        for root, dirs, files in os.walk(eval_dir):
+            # 現在のディレクトリがeval_dirそのものでない場合のみ処理
+            if root != eval_dir:
+                for file in files:
+                    if file.endswith(".json") and "evaluation_report" in file:
+                        all_report_files.append(os.path.join(root, file))
+    
+    # 重複を削除
+    all_report_files = list(set(all_report_files))
+    
+    print(f"Found {len(all_report_files)} evaluation reports:")
+    for report_file in all_report_files[:5]:  # 最初の5つだけ表示
+        print(f"  - {os.path.basename(report_file)}")
+    if len(all_report_files) > 5:
+        print(f"  ... and {len(all_report_files) - 5} more")
+    
+    # ここが重要なポイント: 各レポートを個別に処理
+    for report_file in all_report_files:
+        try:
+            print(f"Processing report: {report_file}")
+            exp_data = load_dual_evaluation_data(os.path.dirname(report_file), report_file)
+            
+            if exp_data:
+                all_experiments_data.append(exp_data)
+                print(f"Added data from report: {os.path.basename(report_file)}")
+                
+                # エージェント情報を出力して確認
+                for agent_type in ["fixed_episodes", "fixed_resource"]:
+                    if agent_type in exp_data:
+                        print(f"  {agent_type.upper()} agents:")
+                        for agent, data in exp_data[agent_type].items():
+                            win_rate = data.get("win_rate", 0)
+                            print(f"    - {agent}: Win rate = {win_rate:.2f}%")
+            else:
+                print(f"Failed to load data from {report_file}")
+        except Exception as e:
+            print(f"Error processing file {report_file}: {e}")
+    
+    print(f"Successfully loaded data from {len(all_experiments_data)} experiment reports")
+    return all_experiments_data
+
+
+def integrate_experiment_data(all_experiments_data):
+    """
+    Integrate data from multiple experiments
+    
+    Args:
+        all_experiments_data: List of data from individual experiments
+        
+    Returns:
+        dict: Integrated data with means and statistical measures
+    """
+    if not all_experiments_data:
+        print("No experiment data to integrate!")
+        return None
+    
+    # Initialize the integrated data structure
+    integrated_data = {
+        "fixed_episodes": {},
+        "fixed_resource": {},
+        "comparison": {},
+        "cnp_metrics": {},
+        "statistics": {
+            "fixed_episodes": {},
+            "fixed_resource": {},
+            "cnp_metrics": {}
+        },
+        "settings": all_experiments_data[0].get("settings", {})
+    }
+    
+    # Get all unique agents across experiments
+    all_agents = set()
+    for exp_data in all_experiments_data:
+        all_agents.update(exp_data.get("fixed_episodes", {}).keys())
+        all_agents.update(exp_data.get("fixed_resource", {}).keys())
+    
+    # Process fixed episodes data
+    for agent in all_agents:
+        win_rates = []
+        avg_times = []
+        memory_mbs = []
+        episodes = []
+        cnp_values = []
+        
+        for exp_data in all_experiments_data:
+            if agent in exp_data.get("fixed_episodes", {}):
+                agent_data = exp_data["fixed_episodes"][agent]
+                win_rates.append(agent_data.get("win_rate", 0))
+                avg_times.append(agent_data.get("avg_time_ms", 0))
+                memory_mbs.append(agent_data.get("memory_mb", 0))
+                episodes.append(agent_data.get("episodes", 0))
+                
+                # Get CNP values if available
+                if "cnp_metrics" in exp_data and agent in exp_data["cnp_metrics"]:
+                    cnp_values.append(exp_data["cnp_metrics"][agent].get("fixed_episodes_cnp", 0))
+        
+        # 各エクスペリメントのデータをデバッグ表示
+        print(f"Agent {agent} data from all experiments:")
+        for i, exp_data in enumerate(all_experiments_data):
+            if agent in exp_data.get("fixed_episodes", {}):
+                agent_data = exp_data["fixed_episodes"][agent]
+                win_rate = agent_data.get("win_rate", 0)
+                print(f"  Experiment {i+1}: Fixed Episodes Win Rate = {win_rate:.2f}%")
+        
+        # Calculate statistics if we have data
+        if win_rates:
+            # Mean values
+            mean_win_rate = np.mean(win_rates)
+            mean_avg_time = np.mean(avg_times)
+            mean_memory_mb = np.mean(memory_mbs)
+            mean_episodes = np.mean(episodes)
+            
+            # Standard deviations
+            std_win_rate = np.std(win_rates)
+            std_avg_time = np.std(avg_times)
+            std_memory_mb = np.std(memory_mbs)
+            
+            # 95% confidence intervals
+            if len(win_rates) > 1:
+                ci_win_rate = stats.t.interval(
+                    0.95, len(win_rates)-1, 
+                    loc=mean_win_rate, 
+                    scale=stats.sem(win_rates)
+                )
+            else:
+                # If only one data point, set CI to the same value
+                ci_win_rate = (mean_win_rate, mean_win_rate)
+            
+            # Store mean values in the main structure
+            integrated_data["fixed_episodes"][agent] = {
+                "win_rate": mean_win_rate,
+                "avg_time_ms": mean_avg_time,
+                "memory_mb": mean_memory_mb,
+                "episodes": mean_episodes
+            }
+            
+            # Store statistical data
+            integrated_data["statistics"]["fixed_episodes"][agent] = {
+                "win_rate": {
+                    "values": win_rates,
+                    "mean": mean_win_rate,
+                    "std": std_win_rate,
+                    "ci_low": ci_win_rate[0],
+                    "ci_high": ci_win_rate[1]
+                },
+                "avg_time_ms": {
+                    "values": avg_times,
+                    "mean": mean_avg_time,
+                    "std": std_avg_time
+                },
+                "memory_mb": {
+                    "values": memory_mbs,
+                    "mean": mean_memory_mb,
+                    "std": std_memory_mb
+                }
+            }
+            
+            # Store CNP statistics if available
+            if cnp_values:
+                mean_cnp = np.mean(cnp_values)
+                std_cnp = np.std(cnp_values) if len(cnp_values) > 1 else 0
+                
+                if agent not in integrated_data["cnp_metrics"]:
+                    integrated_data["cnp_metrics"][agent] = {}
+                    
+                integrated_data["cnp_metrics"][agent]["fixed_episodes_cnp"] = mean_cnp
+                
+                integrated_data["statistics"]["cnp_metrics"][agent] = {
+                    "fixed_episodes_cnp": {
+                        "values": cnp_values,
+                        "mean": mean_cnp,
+                        "std": std_cnp
+                    }
+                }
+            
+            # デバッグ出力を追加
+            print(f"Agent {agent} integrated statistics:")
+            print(f"  Fixed Episodes: {len(win_rates)} values, mean={mean_win_rate:.2f}%, " +
+                  f"CI=[{ci_win_rate[0]:.2f}, {ci_win_rate[1]:.2f}]")
+            print(f"    Raw values: {win_rates}")
+    
+    # Process fixed resource data
+    for agent in all_agents:
+        win_rates = []
+        avg_times = []
+        memory_mbs = []
+        episodes = []
+        cnp_values = []
+        
+        for exp_data in all_experiments_data:
+            if agent in exp_data.get("fixed_resource", {}):
+                agent_data = exp_data["fixed_resource"][agent]
+                win_rates.append(agent_data.get("win_rate", 0))
+                avg_times.append(agent_data.get("avg_time_ms", 0))
+                memory_mbs.append(agent_data.get("memory_mb", 0))
+                episodes.append(agent_data.get("episodes", 0))
+                
+                # Get CNP values if available
+                if "cnp_metrics" in exp_data and agent in exp_data["cnp_metrics"]:
+                    cnp_values.append(exp_data["cnp_metrics"][agent].get("fixed_resource_cnp", 0))
+        
+        # 各エクスペリメントのデータをデバッグ表示
+        for i, exp_data in enumerate(all_experiments_data):
+            if agent in exp_data.get("fixed_resource", {}):
+                agent_data = exp_data["fixed_resource"][agent]
+                win_rate = agent_data.get("win_rate", 0)
+                print(f"  Experiment {i+1}: Fixed Resource Win Rate = {win_rate:.2f}%")
+        
+        # Calculate statistics if we have data
+        if win_rates:
+            # Mean values
+            mean_win_rate = np.mean(win_rates)
+            mean_avg_time = np.mean(avg_times)
+            mean_memory_mb = np.mean(memory_mbs)
+            mean_episodes = np.mean(episodes)
+            
+            # Standard deviations
+            std_win_rate = np.std(win_rates)
+            std_avg_time = np.std(avg_times)
+            std_memory_mb = np.std(memory_mbs)
+            std_episodes = np.std(episodes)
+            
+            # 95% confidence intervals
+            if len(win_rates) > 1:
+                ci_win_rate = stats.t.interval(
+                    0.95, len(win_rates)-1, 
+                    loc=mean_win_rate, 
+                    scale=stats.sem(win_rates)
+                )
+                ci_episodes = stats.t.interval(
+                    0.95, len(episodes)-1, 
+                    loc=mean_episodes, 
+                    scale=stats.sem(episodes)
+                )
+            else:
+                # If only one data point, set CI to the same value
+                ci_win_rate = (mean_win_rate, mean_win_rate)
+                ci_episodes = (mean_episodes, mean_episodes)
+            
+            # Store mean values in the main structure
+            integrated_data["fixed_resource"][agent] = {
+                "win_rate": mean_win_rate,
+                "avg_time_ms": mean_avg_time,
+                "memory_mb": mean_memory_mb,
+                "episodes": mean_episodes
+            }
+            
+            # Store statistical data
+            integrated_data["statistics"]["fixed_resource"][agent] = {
+                "win_rate": {
+                    "values": win_rates,
+                    "mean": mean_win_rate,
+                    "std": std_win_rate,
+                    "ci_low": ci_win_rate[0],
+                    "ci_high": ci_win_rate[1]
+                },
+                "avg_time_ms": {
+                    "values": avg_times,
+                    "mean": mean_avg_time,
+                    "std": std_avg_time
+                },
+                "memory_mb": {
+                    "values": memory_mbs,
+                    "mean": mean_memory_mb,
+                    "std": std_memory_mb
+                },
+                "episodes": {
+                    "values": episodes,
+                    "mean": mean_episodes,
+                    "std": std_episodes,
+                    "ci_low": ci_episodes[0],
+                    "ci_high": ci_episodes[1]
+                }
+            }
+            
+            # Store CNP statistics if available
+            if cnp_values:
+                mean_cnp = np.mean(cnp_values)
+                std_cnp = np.std(cnp_values) if len(cnp_values) > 1 else 0
+                
+                if agent not in integrated_data["cnp_metrics"]:
+                    integrated_data["cnp_metrics"][agent] = {}
+                    
+                integrated_data["cnp_metrics"][agent]["fixed_resource_cnp"] = mean_cnp
+                
+                if agent not in integrated_data["statistics"]["cnp_metrics"]:
+                    integrated_data["statistics"]["cnp_metrics"][agent] = {}
+                
+                integrated_data["statistics"]["cnp_metrics"][agent]["fixed_resource_cnp"] = {
+                    "values": cnp_values,
+                    "mean": mean_cnp,
+                    "std": std_cnp
+                }
+    
+    return integrated_data
 
 
 def create_cnp_visualization(data, output_dir):
@@ -572,50 +961,107 @@ def create_cnp_visualization(data, output_dir):
     plt.close()
     
     # 5. Create statistical comparison chart
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(14, 10))  # 図のサイズを拡大
     
     stats_data = []
     
     for agent in unique_agents:
-        np.random.seed(42)
+        # Use actual experimental data instead of random data
+        if "statistics" in data:
+            # Get data from multiple experiments if available
+            ep_win_rate = data["fixed_episodes"].get(agent, {}).get("win_rate", 50)
+            res_win_rate = data["fixed_resource"].get(agent, {}).get("win_rate", 50)
+            
+            # Get real statistical values
+            ep_stats = data["statistics"]["fixed_episodes"].get(agent, {}).get("win_rate", {})
+            res_stats = data["statistics"]["fixed_resource"].get(agent, {}).get("win_rate", {})
+            
+            ep_ci_low = ep_stats.get("ci_low", ep_win_rate)
+            ep_ci_high = ep_stats.get("ci_high", ep_win_rate)
+            res_ci_low = res_stats.get("ci_low", res_win_rate)
+            res_ci_high = res_stats.get("ci_high", res_win_rate)
+            
+            # Get actual win rate values from experiments for t-test
+            ep_wins = ep_stats.get("values", [ep_win_rate])
+            res_wins = res_stats.get("values", [res_win_rate])
+            
+            print(f"Agent {agent} statistics for visualization:")
+            print(f"  Fixed Episodes: Win rate = {ep_win_rate:.2f}%, CI = [{ep_ci_low:.2f}, {ep_ci_high:.2f}]")
+            print(f"    Raw values: {ep_wins}")
+            print(f"  Fixed Resource: Win rate = {res_win_rate:.2f}%, CI = [{res_ci_low:.2f}, {res_ci_high:.2f}]")
+            print(f"    Raw values: {res_wins}")
+        else:
+            # Fallback to the original implementation with random data
+            np.random.seed(42)
+            ep_win_rate = data["fixed_episodes"].get(agent, {}).get("win_rate", 50)
+            res_win_rate = data["fixed_resource"].get(agent, {}).get("win_rate", 50)
+            
+            ep_wins = np.random.normal(ep_win_rate, ep_win_rate * 0.05, 30)
+            res_wins = np.random.normal(res_win_rate, res_win_rate * 0.05, 30)
+            
+            # Calculate confidence intervals from random data
+            ep_ci = stats.t.interval(0.95, len(ep_wins)-1, loc=np.mean(ep_wins), scale=stats.sem(ep_wins))
+            res_ci = stats.t.interval(0.95, len(res_wins)-1, loc=np.mean(res_wins), scale=stats.sem(res_wins))
+            
+            ep_ci_low = ep_ci[0]
+            ep_ci_high = ep_ci[1]
+            res_ci_low = res_ci[0]
+            res_ci_high = res_ci[1]
+            
+            print(f"Warning: Using simulated data for statistical analysis of agent {agent}")
         
-        ep_win_rate = data["fixed_episodes"].get(agent, {}).get("win_rate", 50)
-        res_win_rate = data["fixed_resource"].get(agent, {}).get("win_rate", 50)
-        
-        ep_wins = np.random.normal(ep_win_rate, ep_win_rate * 0.05, 30)
-        res_wins = np.random.normal(res_win_rate, res_win_rate * 0.05, 30)
-        
-        t_stat, p_value = stats.ttest_ind(ep_wins, res_wins)
-        cohens_d = (np.mean(res_wins) - np.mean(ep_wins)) / np.sqrt((np.std(ep_wins)**2 + np.std(res_wins)**2) / 2)
-        
-        ep_ci = stats.t.interval(0.95, len(ep_wins)-1, loc=np.mean(ep_wins), scale=stats.sem(ep_wins))
-        res_ci = stats.t.interval(0.95, len(res_wins)-1, loc=np.mean(res_wins), scale=stats.sem(res_wins))
+        # Calculate statistical significance with available data
+        if len(ep_wins) > 1 and len(res_wins) > 1:
+            t_stat, p_value = stats.ttest_ind(ep_wins, res_wins)
+            cohens_d = (np.mean(res_wins) - np.mean(ep_wins)) / np.sqrt((np.std(ep_wins)**2 + np.std(res_wins)**2) / 2)
+        else:
+            # Cannot perform t-test with only one sample
+            p_value = 1.0
+            cohens_d = 0.0
         
         stats_data.append({
             "Agent": agent,
             "Fixed Episodes Win": ep_win_rate,
-            "Fixed Episodes CI Low": ep_ci[0],
-            "Fixed Episodes CI High": ep_ci[1],
+            "Fixed Episodes CI Low": ep_ci_low,
+            "Fixed Episodes CI High": ep_ci_high,
             "Fixed Resource Win": res_win_rate,
-            "Fixed Resource CI Low": res_ci[0],
-            "Fixed Resource CI High": res_ci[1],
+            "Fixed Resource CI Low": res_ci_low,
+            "Fixed Resource CI High": res_ci_high,
             "p_value": p_value,
             "cohens_d": cohens_d
         })
     
+    # statsデータフレームを作成
     stats_df = pd.DataFrame(stats_data)
     
     x = np.arange(len(unique_agents))
     width = 0.35
     
+    # エラーバーの計算を修正
+    ep_yerr = [
+        [max(0, row["Fixed Episodes Win"] - max(0, row["Fixed Episodes CI Low"])) for _, row in stats_df.iterrows()],
+        [max(0, row["Fixed Episodes CI High"] - row["Fixed Episodes Win"]) for _, row in stats_df.iterrows()]
+    ]
+    res_yerr = [
+        [max(0, row["Fixed Resource Win"] - max(0, row["Fixed Resource CI Low"])) for _, row in stats_df.iterrows()],
+        [max(0, row["Fixed Resource CI High"] - row["Fixed Resource Win"]) for _, row in stats_df.iterrows()]
+    ]
+    
+    print("Error bar values for Fixed Episodes:")
+    print(f"  Lower: {ep_yerr[0]}")
+    print(f"  Upper: {ep_yerr[1]}")
+    
+    print("Error bar values for Fixed Resource:")
+    print(f"  Lower: {res_yerr[0]}")
+    print(f"  Upper: {res_yerr[1]}")
+    
+    # グラフ描画
     plt.bar(x - width/2, stats_df["Fixed Episodes Win"], width, 
-            yerr=[(stats_df["Fixed Episodes Win"] - stats_df["Fixed Episodes CI Low"]), 
-                   (stats_df["Fixed Episodes CI High"] - stats_df["Fixed Episodes Win"])],
+            yerr=ep_yerr,
             color='skyblue', label='Fixed Episodes', capsize=5)
             
     plt.bar(x + width/2, stats_df["Fixed Resource Win"], width,
-            yerr=[(stats_df["Fixed Resource Win"] - stats_df["Fixed Resource CI Low"]), 
-                   (stats_df["Fixed Resource CI High"] - stats_df["Fixed Resource Win"])],
+            yerr=res_yerr,
             color='salmon', label='Fixed Resource', capsize=5)
     
     for i, row in stats_df.iterrows():
@@ -653,56 +1099,117 @@ def create_cnp_visualization(data, output_dir):
     plt.legend()
     plt.grid(True, axis='y', linestyle='--', alpha=0.7)
     
-    plt.figtext(0.01, 0.01, "* p<0.05, ** p<0.01, *** p<0.001", fontsize=10)
+    # エラーバーに関する説明を追加
+    if "statistics" in data:
+        plt.figtext(0.01, 0.01, 
+                "Error bars represent 95% confidence intervals based on multiple experiments", 
+                fontsize=10, style='italic')
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "statistical_comparison.png"), dpi=300)
+    # グラフの余白を十分に確保して警告を回避
+    plt.subplots_adjust(bottom=0.15, top=0.9)  # 上下に余白を追加
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # タイトルとキャプションのための余白を確保
+    plt.savefig(os.path.join(output_dir, "statistical_comparison.png"), dpi=300, bbox_inches='tight')
     plt.close()
     
     return True
 
 
-def run_analysis(eval_dir, output_dir=None):
+def run_analysis(eval_dir, output_dir=None, use_multiple_experiments=False, experiment_dirs=None):
     """
     Run the CNP analysis
     
     Args:
         eval_dir: Directory containing evaluation reports
         output_dir: Directory to save visualizations (None for auto-generation)
+        use_multiple_experiments: Flag to use multiple experiment data
+        experiment_dirs: List of specific experiment directories to use
         
     Returns:
         bool: Success flag
     """
+    # 相対パスが指定された場合はプロジェクトルートを考慮
+    if eval_dir.startswith('./') or eval_dir.startswith('../'):
+        project_root = find_project_root()
+        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
+        if eval_dir == './evaluations':
+            eval_dir = os.path.join(project_root, 'evaluations')
+            print(f"Using project root evaluations directory: {eval_dir}")
+
     if output_dir is None:
         output_dir = os.path.join(eval_dir, "analysis")
     
-    data = load_dual_evaluation_data(eval_dir)
-    if not data:
-        print("Failed to load evaluation data.")
-        return False
+    if use_multiple_experiments:
+        # Load and integrate data from multiple experiments
+        print("Loading data from multiple experiments...")
+        all_experiments_data = load_multiple_experiment_data(eval_dir, experiment_dirs)
+        
+        if not all_experiments_data:
+            print("Failed to load multiple experiment data.")
+            # 読み込みに失敗した場合は単一実験モードにフォールバック
+            print("Falling back to single experiment mode...")
+            use_multiple_experiments = False
+            data = load_dual_evaluation_data(eval_dir)
+            if not data:
+                print("Failed to load evaluation data in fallback mode.")
+                return False
+        else:
+            print(f"Successfully loaded {len(all_experiments_data)} experiments. Integrating data...")
+            # データ統合前の詳細情報を表示
+            for i, exp_data in enumerate(all_experiments_data):
+                print(f"Experiment {i+1} agents:")
+                for agent_type in ["fixed_episodes", "fixed_resource"]:
+                    if agent_type in exp_data:
+                        print(f"  {agent_type.upper()}:")
+                        for agent, data in exp_data[agent_type].items():
+                            win_rate = data.get("win_rate", 0)
+                            print(f"    - {agent}: Win rate = {win_rate:.2f}%")
+                            
+            data = integrate_experiment_data(all_experiments_data)
+            
+            if not data:
+                print("Failed to integrate experiment data.")
+                return False
+                
+            print("Data integration complete. Creating visualizations...")
+    else:
+        # Use the original single experiment method
+        data = load_dual_evaluation_data(eval_dir)
+        if not data:
+            print("Failed to load evaluation data.")
+            return False
     
     success = create_cnp_visualization(data, output_dir)
     
     if success:
-        print(f"CNP analysis completed. Visualizations saved to: {output_dir}")
+        if use_multiple_experiments:
+            print(f"CNP analysis of multiple experiments completed. Visualizations saved to: {output_dir}")
+        else:
+            print(f"CNP analysis completed. Visualizations saved to: {output_dir}")
     
     return success
 
 
 if __name__ == "__main__":
     import sys
+    import argparse
     
-    if len(sys.argv) > 1:
-        eval_dir = sys.argv[1]
-    else:
-        eval_dir = "./evaluations"
-        
-    if len(sys.argv) > 2:
-        output_dir = sys.argv[2]
-    else:
-        output_dir = None
-        
-    success = run_analysis(eval_dir, output_dir)
+    # プロジェクトルートの検出
+    project_root = find_project_root()
+    default_eval_dir = os.path.join(project_root, 'evaluations')
+    
+    parser = argparse.ArgumentParser(description='CNP Analysis Tool')
+    parser.add_argument('--eval_dir', type=str, default=default_eval_dir,
+                        help='Directory containing evaluation data')
+    parser.add_argument('--output_dir', type=str, default=None,
+                        help='Directory to save visualizations')
+    parser.add_argument('--multiple', action='store_true',
+                        help='Use multiple experiments data integration')
+    parser.add_argument('--experiments', nargs='+', default=None,
+                        help='Specific experiment directories to use')
+    
+    args = parser.parse_args()
+    
+    success = run_analysis(args.eval_dir, args.output_dir, args.multiple, args.experiments)
     
     if success:
         print("Analysis completed successfully!")
