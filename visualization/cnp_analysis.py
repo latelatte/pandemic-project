@@ -961,7 +961,7 @@ def create_cnp_visualization(data, output_dir):
     plt.close()
     
     # 5. Create statistical comparison chart
-    plt.figure(figsize=(14, 10))  # 図のサイズを拡大
+    plt.figure(figsize=(12, 8))  # 元のサイズに戻す (14, 10)から(12, 8)へ
     
     stats_data = []
     
@@ -980,7 +980,7 @@ def create_cnp_visualization(data, output_dir):
             ep_ci_high = ep_stats.get("ci_high", ep_win_rate)
             res_ci_low = res_stats.get("ci_low", res_win_rate)
             res_ci_high = res_stats.get("ci_high", res_win_rate)
-            
+
             # Get actual win rate values from experiments for t-test
             ep_wins = ep_stats.get("values", [ep_win_rate])
             res_wins = res_stats.get("values", [res_win_rate])
@@ -1055,7 +1055,6 @@ def create_cnp_visualization(data, output_dir):
     print(f"  Lower: {res_yerr[0]}")
     print(f"  Upper: {res_yerr[1]}")
     
-    # グラフ描画
     plt.bar(x - width/2, stats_df["Fixed Episodes Win"], width, 
             yerr=ep_yerr,
             color='skyblue', label='Fixed Episodes', capsize=5)
@@ -1063,6 +1062,13 @@ def create_cnp_visualization(data, output_dir):
     plt.bar(x + width/2, stats_df["Fixed Resource Win"], width,
             yerr=res_yerr,
             color='salmon', label='Fixed Resource', capsize=5)
+    
+    # 各バーの上に勝率のラベルを追加
+    for i, row in stats_df.iterrows():
+        plt.text(x[i] - width/2, row["Fixed Episodes Win"] + ep_yerr[1][i] + 0.1, 
+                f"{row['Fixed Episodes Win']:.2f}%", ha='center', va='bottom', fontsize=9)
+        plt.text(x[i] + width/2, row["Fixed Resource Win"] + res_yerr[1][i] + 0.1, 
+                f"{row['Fixed Resource Win']:.2f}%", ha='center', va='bottom', fontsize=9)
     
     for i, row in stats_df.iterrows():
         significance = ""
@@ -1105,10 +1111,9 @@ def create_cnp_visualization(data, output_dir):
                 "Error bars represent 95% confidence intervals based on multiple experiments", 
                 fontsize=10, style='italic')
     
-    # グラフの余白を十分に確保して警告を回避
-    plt.subplots_adjust(bottom=0.15, top=0.9)  # 上下に余白を追加
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # タイトルとキャプションのための余白を確保
-    plt.savefig(os.path.join(output_dir, "statistical_comparison.png"), dpi=300, bbox_inches='tight')
+    # レイアウト調整を簡素化
+    plt.tight_layout()  # 複雑な余白調整をシンプルに
+    plt.savefig(os.path.join(output_dir, "statistical_comparison.png"), dpi=300)
     plt.close()
     
     return True
