@@ -7,6 +7,31 @@ import os
 import json
 import glob
 
+def find_project_root():
+    """
+    プロジェクトルートディレクトリを自動検出する
+    
+    Returns:
+        str: プロジェクトルートのパス
+    """
+    # 現在のスクリプトの絶対パス
+    current_path = os.path.abspath(__file__)
+    
+    # 現在のスクリプトのディレクトリ
+    current_dir = os.path.dirname(current_path)
+    
+    # 親ディレクトリ (おそらくプロジェクトルート)
+    parent_dir = os.path.dirname(current_dir)
+    
+    # プロジェクトルートの検証 (evaluationsディレクトリが存在するか確認)
+    if os.path.exists(os.path.join(parent_dir, "evaluations")):
+        print(f"Found project root: {parent_dir}")
+        return parent_dir
+    
+    # evaluationsが見つからない場合は、現在のディレクトリを返す (フォールバック)
+    print(f"Project root not detected. Using current directory: {current_dir}")
+    return current_dir
+
 def load_agent_data(results_dir):
     """load agent performance data from JSON file"""
     metrics_file = os.path.join(results_dir, "metrics.json")
@@ -37,10 +62,62 @@ def load_agent_data(results_dir):
         print(f"error: {e}")
         return None
 
-def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="experiment_*"):
+def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="experiment_*", use_multiple_experiments=False):
     """create a DataFrame from multiple experiment directories"""
+    # 相対パスが指定された場合はプロジェクトルートを考慮
+    if results_dir.startswith('./') or results_dir.startswith('../'):
+        project_root = find_project_root()
+        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
+        if results_dir == './evaluations':
+            results_dir = os.path.join(project_root, 'evaluations')
+            print(f"Using project root evaluations directory: {results_dir}")
+    
+    # ディレクトリパスを絶対パスに変換して存在確認
+    results_dir = os.path.abspath(results_dir)
+    print(f"Using base directory: {results_dir}")
+    
+    if not os.path.exists(results_dir):
+        print(f"Error: Directory '{results_dir}' does not exist.")
+        return None
+
     if os.path.isdir(results_dir) and not results_dir.endswith("logs"):
-        experiment_dirs = [results_dir]
+        if use_multiple_experiments:
+            # 複数実験モード：指定ディレクトリ内のすべての評価レポートを検索
+            print("Using multiple experiments mode")
+            report_files = []
+            
+            # 直接ディレクトリ内のレポートを探す
+            integrated_reports = glob.glob(os.path.join(results_dir, "integrated_evaluation_report_*.json"))
+            evaluation_reports = glob.glob(os.path.join(results_dir, "*evaluation_report_*.json"))
+            
+            # 「integrated」を含むレポートを除外（単一実験用）
+            evaluation_reports = [f for f in evaluation_reports if "integrated" not in os.path.basename(f).lower()]
+            
+            # 両方のリストを統合
+            report_files.extend(integrated_reports)
+            report_files.extend(evaluation_reports)
+            
+            # サブディレクトリも探索
+            for root, dirs, files in os.walk(results_dir):
+                # 現在のディレクトリがresults_dirそのものでない場合のみ処理
+                if root != results_dir:
+                    for file in files:
+                        if file.endswith(".json") and "evaluation_report" in file:
+                            report_files.append(os.path.join(root, file))
+            
+            # 重複を削除
+            report_files = list(set(report_files))
+            
+            print(f"Found {len(report_files)} evaluation reports:")
+            for report_file in report_files[:5]:  # 最初の5つだけ表示
+                print(f"  - {os.path.basename(report_file)}")
+            if len(report_files) > 5:
+                print(f"  ... and {len(report_files) - 5} more")
+            
+            experiment_dirs = [results_dir]  # 直接results_dirを使用
+        else:
+            # 単一実験モード：従来通りの処理
+            experiment_dirs = [results_dir]
     else:
         base_dir = results_dir if results_dir.endswith("logs") else "./logs"
         experiment_dirs = sorted([os.path.join(base_dir, d) for d in os.listdir(base_dir) 
@@ -49,52 +126,99 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
     
     all_agent_data = {}
     
-    for exp_dir in experiment_dirs:
-        # パスの構築を修正：正確なJSONファイルのパスを取得
-        metrics_files = glob.glob(os.path.join(exp_dir, "*.json"))
-        if not metrics_files:
-            # 評価ディレクトリ内を探す
-            metrics_files = glob.glob(os.path.join(exp_dir, "evaluations", "*.json"))
-            
-        if not metrics_files:
-            print(f"WARN: No JSON metrics files found in {exp_dir}")
-            continue
-            
-        # 最新のメトリクスファイルを使用
-        metrics_file = max(metrics_files, key=os.path.getctime)
-        print(f"Processing metrics file: {metrics_file}")
-            
-        try:
-            with open(metrics_file, 'r') as f:
-                data = json.load(f)
+    # 複数実験モードの場合は、各レポートファイルを直接処理
+    if use_multiple_experiments and 'report_files' in locals():
+        for report_file in report_files:
+            try:
+                print(f"Processing report: {report_file}")
                 
-            for agent_name, metrics in data.get("agent_performance", {}).items():
-                if agent_name not in all_agent_data:
-                    all_agent_data[agent_name] = {
-                        "win_rates": [], "times": [], "memory": [], "cpu": []
-                    }
+                with open(report_file, 'r') as f:
+                    data = json.load(f)
                 
-                resource_usage = data.get("resource_usage", {}).get(agent_name, {})
-                win_rate = metrics.get("win_rate", 0) * 100
-                avg_time = metrics.get("avg_time_ms", 0)
-                memory = resource_usage.get("avg_memory_mb", 0)
-                cpu = resource_usage.get("avg_cpu_percent", 0)
+                # 固定エピソードと固定リソースの両方のデータを処理
+                for eval_type in ["fixed_episodes_results", "fixed_resource_results"]:
+                    for agent_name, metrics in data.get(eval_type, {}).items():
+                        # エージェント名に評価タイプを追加 - 明確な表記に修正
+                        eval_display_name = "Fixed Episodes" if "episodes" in eval_type else "Fixed Resource"
+                        qualified_agent_name = f"{agent_name} ({eval_display_name})"
+                        
+                        if qualified_agent_name not in all_agent_data:
+                            all_agent_data[qualified_agent_name] = {
+                                "win_rates": [], "times": [], "memory": [], "cpu": []
+                            }
+                        
+                        # この実験のデータを集約
+                        win_rate = metrics.get("win_rate", 0) * 100
+                        
+                        agent_perf = metrics.get("agent_performance", {}).get(agent_name, {})
+                        avg_time = agent_perf.get("avg_time_ms", 0)
+                        
+                        resource_usage = metrics.get("resource_usage", {}).get(agent_name, {})
+                        memory = resource_usage.get("avg_memory_mb", 0)
+                        cpu = resource_usage.get("avg_cpu_percent", 0)
+                        
+                        print(f"Agent: {qualified_agent_name}, Win Rate: {win_rate:.2f}%, Memory: {memory}, Source: {os.path.basename(report_file)}")
+                        
+                        all_agent_data[qualified_agent_name]["win_rates"].append(win_rate)
+                        all_agent_data[qualified_agent_name]["times"].append(avg_time)
+                        all_agent_data[qualified_agent_name]["memory"].append(memory)
+                        all_agent_data[qualified_agent_name]["cpu"].append(cpu)
                 
-                print(f"Agent: {agent_name}, Memory: {memory}, Source: {metrics_file}")
+            except Exception as e:
+                print(f"Error occurred in processing {report_file}: {e}")
+    else:
+        # 従来の方法で実験ディレクトリを処理
+        for exp_dir in experiment_dirs:
+            # パスの構築を修正：正確なJSONファイルのパスを取得
+            metrics_files = glob.glob(os.path.join(exp_dir, "*.json"))
+            if not metrics_files:
+                # 評価ディレクトリ内を探す
+                metrics_files = glob.glob(os.path.join(exp_dir, "evaluations", "*.json"))
                 
-                all_agent_data[agent_name]["win_rates"].append(win_rate)
-                all_agent_data[agent_name]["times"].append(avg_time)
-                all_agent_data[agent_name]["memory"].append(memory)
-                all_agent_data[agent_name]["cpu"].append(cpu)
+            if not metrics_files:
+                print(f"WARN: No JSON metrics files found in {exp_dir}")
+                continue
                 
-        except Exception as e:
-            print(f"Error occurred in processing {metrics_file}: {e}")
+            # 最新のメトリクスファイルを使用
+            metrics_file = max(metrics_files, key=os.path.getctime)
+            print(f"Processing metrics file: {metrics_file}")
+                
+            try:
+                with open(metrics_file, 'r') as f:
+                    data = json.load(f)
+                    
+                for agent_name, metrics in data.get("agent_performance", {}).items():
+                    if agent_name not in all_agent_data:
+                        all_agent_data[agent_name] = {
+                            "win_rates": [], "times": [], "memory": [], "cpu": []
+                        }
+                    
+                    resource_usage = data.get("resource_usage", {}).get(agent_name, {})
+                    win_rate = metrics.get("win_rate", 0) * 100
+                    avg_time = metrics.get("avg_time_ms", 0)
+                    memory = resource_usage.get("avg_memory_mb", 0)
+                    cpu = resource_usage.get("avg_cpu_percent", 0)
+                    
+                    print(f"Agent: {agent_name}, Memory: {memory}, Source: {metrics_file}")
+                    
+                    all_agent_data[agent_name]["win_rates"].append(win_rate)
+                    all_agent_data[agent_name]["times"].append(avg_time)
+                    all_agent_data[agent_name]["memory"].append(memory)
+                    all_agent_data[agent_name]["cpu"].append(cpu)
+                    
+            except Exception as e:
+                print(f"Error occurred in processing {metrics_file}: {e}")
     
-    # convert to DataFrame
+    # convert to DataFrame with statistical measures
     aggregated_data = []
     for agent_name, data in all_agent_data.items():
         if not data["win_rates"]:
             continue
+            
+        # 各エージェントのデータをデバッグ表示
+        print(f"Agent {agent_name} data from all experiments:")
+        for i, win_rate in enumerate(data["win_rates"]):
+            print(f"  Experiment {i+1}: Win Rate = {win_rate:.2f}%, Time = {data['times'][i]:.2f}ms, Memory = {data['memory'][i]:.2f}MB")
             
         aggregated_data.append({
             "Agent": agent_name,
@@ -109,7 +233,23 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
             "n_samples": len(data["win_rates"])
         })
     
-    return pd.DataFrame(aggregated_data) if aggregated_data else None
+    df = pd.DataFrame(aggregated_data) if aggregated_data else None
+    
+    # 統計情報の表示
+    if df is not None:
+        print("\nAggregate Statistics:")
+        for _, row in df.iterrows():
+            agent = row["Agent"]
+            win_rate = row["Win Rate (%)"]
+            win_std = row["Win Rate StdDev"]
+            memory = row["Memory (MB)"]
+            memory_std = row["Memory StdDev"]
+            n = row["n_samples"]
+            
+            print(f"{agent}: Win Rate = {win_rate:.2f}% ±{win_std:.2f} (n={n}), Memory = {memory:.2f}MB ±{memory_std:.2f}")
+        
+    return df
+
 
 def compute_pareto_frontier(points):
     """calculate the Pareto frontier from a list of points"""
@@ -129,6 +269,16 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
                           size_col=None, minimize_x=True, maximize_y=True, show_size_values=False):
     """for 2D Pareto chart"""
     plt.figure(figsize=(12, 8))
+    
+
+    if 'Evaluation' not in df.columns:
+        df['Evaluation'] = df['Agent'].apply(
+            lambda x: x.split('(')[-1].replace(')', '') if '(' in x else 'Unknown'
+        )
+
+        df['Agent'] = df['Agent'].apply(
+            lambda x: x.split(' (')[0] if ' (' in x else x
+        )
     
     if size_col:
         scatter = sns.scatterplot(
@@ -176,17 +326,15 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         x = row[x_col]
         y = row[y_col]
         
-        if "Evaluation" in df.columns:
-            label = f"{row['Agent']} ({row['Evaluation']})"
-        else:
-            label = row["Agent"]
+        # 明確な表記でラベルを表示
+        label = f"{row['Agent']} ({row['Evaluation']})"
             
         plt.annotate(
             label,
             (x, y),
             xytext=(5, -15),
             textcoords="offset points",
-            fontsize=9,
+            fontsize=12,
             alpha=0.9
         )
         
@@ -198,7 +346,7 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
                 (x, y),
                 xytext=(10, 8),
                 textcoords="offset points",
-                fontsize=8,
+                fontsize=12,
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7)
             )
     
@@ -275,17 +423,30 @@ def create_3d_visualization(df, output_dir):
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
+    df_3d = df.copy()
+    if 'Evaluation' not in df_3d.columns:
+        df_3d['Evaluation'] = df_3d['Agent'].apply(
+            lambda x: x.split('(')[-1].replace(')', '') if '(' in x else 'Unknown'
+        )
+        df_3d['Agent'] = df_3d['Agent'].apply(
+            lambda x: x.split(' (')[0] if ' (' in x else x
+        )
+    
+    df_3d['Legend'] = df_3d.apply(
+        lambda row: f"{row['Agent']} ({row['Evaluation']})", axis=1
+    )
+    
     markers = ['o', '^', 's', 'D', '*']
     colormap = plt.cm.viridis
-    colors = [colormap(i) for i in np.linspace(0, 1, len(df['Agent'].unique()))]
+    colors = [colormap(i) for i in np.linspace(0, 1, len(df_3d['Legend'].unique()))]
     
-    for i, agent in enumerate(df['Agent'].unique()):
-        agent_data = df[df['Agent'] == agent]
+    for i, legend_name in enumerate(df_3d['Legend'].unique()):
+        agent_data = df_3d[df_3d['Legend'] == legend_name]
         ax.scatter(
             agent_data['Avg Time (ms)'].values,
             agent_data['Memory (MB)'].values,
             agent_data['Win Rate (%)'].values,
-            label=agent,
+            label=legend_name,
             marker=markers[i % len(markers)],
             color=colors[i % len(colors)],
             s=150
@@ -333,65 +494,101 @@ def create_3d_visualization(df, output_dir):
     plt.close()
 
 def create_radar_chart(df, output_dir):
-    """visualize performance metrics using radar chart"""
-    df_norm = df.copy()
-
-    maximize_metrics = ["Win Rate (%)"]
-    minimize_metrics = ["Avg Time (ms)", "Memory (MB)"]
+    """visualize performance metrics using radar chart with improved readability"""
+    # エージェント名から"Agent"を削除
+    df_radar = df.copy()
+    if 'Evaluation' not in df_radar.columns:
+        df_radar['Evaluation'] = df_radar['Agent'].apply(
+            lambda x: x.split('(')[-1].replace(')', '') if '(' in x else 'Unknown'
+        )
+        df_radar['Agent'] = df_radar['Agent'].apply(
+            lambda x: x.split(' (')[0].replace('Agent', '') if ' (' in x else x.replace('Agent', '')
+        )
     
-    # normalize metrics
-    for col in maximize_metrics + minimize_metrics:
-        max_val = df[col].max()
-        min_val = df[col].min()
-        range_val = max_val - min_val
-        
-        if range_val > 0:
-            if col in minimize_metrics:
-                df_norm[col] = 1 - ((df[col] - min_val) / range_val)
-            else:
-                df_norm[col] = (df[col] - min_val) / range_val
-        else:
-            df_norm[col] = 0.5  # if no variation, set to 0.5
+    # レジェンドラベルに評価タイプを含める
+    df_radar['Legend'] = df_radar.apply(
+        lambda row: f"{row['Agent']} ({row['Evaluation']})", axis=1
+    )
     
     categories = ['Win Rate', 'Time Efficiency', 'Memory Efficiency']
     
-    fig = plt.figure(figsize=(10, 8))
+    # 図のサイズを拡大して余白を確保
+    fig = plt.figure(figsize=(14, 10))
     ax = fig.add_subplot(111, polar=True)
     
     N = len(categories)
-    
     angles = [n / float(N) * 2 * np.pi for n in range(N)]
     angles += angles[:1]
     
-    for i, agent in enumerate(df_norm['Agent'].unique()):
-        agent_data = df_norm[df_norm['Agent'] == agent]
-        values = agent_data[["Win Rate (%)", "Avg Time (ms)", "Memory (MB)"]].values.flatten().tolist()
-        values += values[:1]
+    # 線のスタイルを改良
+    linestyles = {
+        'Fixed Episodes': '-',
+        'Fixed Resource': '--'
+    }
+    
+    markers = {
+        'MCTS': 'o',
+        'EA': 's',
+        'MARL': '^'
+    }
+    
+    for i, legend_name in enumerate(df_radar['Legend'].unique()):
+        agent_data = df_radar[df_radar['Legend'] == legend_name]
         
-        ax.plot(angles, values, linewidth=2, linestyle='-', label=agent)
+        agent_name = agent_data['Agent'].iloc[0]
+        eval_type = agent_data['Evaluation'].iloc[0]
+        
+        # カテゴリに対応する値の正規化を行う
+        win_rate = agent_data['Win Rate (%)'].iloc[0] / 100.0  # Win Rateを0-1に正規化
+        
+        # Time Efficiencyの計算 (小さい方が良いので逆数を取って正規化)
+        avg_time = agent_data['Avg Time (ms)'].iloc[0]
+        time_efficiency = 1.0 / (1.0 + avg_time / 100.0)  # 時間が短いほど値が大きい
+        
+        # Memory Efficiencyの計算 (小さい方が良いので逆数を取って正規化)
+        memory = agent_data['Memory (MB)'].iloc[0]
+        memory_efficiency = 1.0 / (1.0 + memory / 100.0)  # メモリ使用量が少ないほど値が大きい
+        
+        # レーダーチャート用の値の配列を作成
+        values = [win_rate, time_efficiency, memory_efficiency]
+        
+        # 値を0-1の範囲に制限
+        values = [max(0.0, min(1.0, v)) for v in values]
+        
+        # 閉じた図形にするために最初の値を追加
+        values += values[:1]
+
+        linestyle = linestyles.get(eval_type, '-')
+        marker = markers.get(agent_name, 'o')
+        
+        ax.plot(angles, values, linewidth=2, linestyle=linestyle, label=legend_name,
+               marker=marker, markersize=8)
         ax.fill(angles, values, alpha=0.1)
     
-    plt.xticks(angles[:-1], categories, fontsize=12)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    clean_labels = [label.replace('Agent', '') for label in labels]
+
+    plt.xticks(angles[:-1], categories, fontsize=16)
     ax.set_rlabel_position(0)
-    plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=10)
+    plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=14)
     plt.ylim(0, 1)
+
+    plt.figtext(0.78, 0.47, "Higher is better", ha='center', va='center', fontsize=14, 
+            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
     
-    plt.annotate('The higher the win rate, the better', xy=(0, 0.9), xytext=(0.2, 1.1), 
-                textcoords='axes fraction', ha='center',
-                arrowprops=dict(arrowstyle='->', color='blue'))
+    plt.figtext(0.36, 0.87, "Higher is better", ha='center', va='center', fontsize=14,
+            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
     
-    plt.annotate('The less proccessing time, the better', xy=(2*np.pi/3, 0.9), xytext=(0.8, 1.1), 
-                textcoords='axes fraction', ha='center',
-                arrowprops=dict(arrowstyle='->', color='blue'))
+    plt.figtext(0.36, 0.13, "Higher is better", ha='center', va='center', fontsize=14,
+            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
     
-    plt.annotate('The less memory consumption, the better', xy=(4*np.pi/3, 0.9), xytext=(0.5, 1.2), 
-                textcoords='axes fraction', ha='center',
-                arrowprops=dict(arrowstyle='->', color='blue'))
+
+    plt.legend(handles, clean_labels, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=3, 
+              fontsize=14, framealpha=0.9)
     
-    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0), title="Agent")
-    plt.title("Multi-dimensional Agent Comparison", size=16)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "radar_comparison.png"), dpi=300)
+    plt.title("Multi-dimensional Agent Comparison", size=20, pad=30)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig(os.path.join(output_dir, "radar_comparison.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./adaptedData"):
@@ -412,14 +609,13 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
     metrics = {"agent_performance": {}, "resource_usage": {}}
     
     for agent_name, data in fixed_episodes.items():
-        episodes_agent_name = f"{agent_name} (Fixed Episode)"
+        episodes_agent_name = f"{agent_name} (Fixed Episodes)"
         metrics["agent_performance"][episodes_agent_name] = {"win_rate": data.get("win_rate", 0)}
         
         agent_perf = data.get("agent_performance", {}).get(agent_name, {})
         if agent_perf:
             metrics["agent_performance"][episodes_agent_name].update(agent_perf)
         
-        # リソース使用量データの取得とデバッグ出力を追加
         resource_data = data.get("resource_usage", {}).get(agent_name, {})
         memory_value = resource_data.get("avg_memory_mb", 0)
         print(f"Fixed Episodes - Agent: {agent_name}, Memory: {memory_value}")
@@ -434,7 +630,6 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
         if agent_perf:
             metrics["agent_performance"][resource_agent_name].update(agent_perf)
         
-        # リソース使用量データの取得とデバッグ出力を追加
         resource_data = data.get("resource_usage", {}).get(agent_name, {})
         memory_value = resource_data.get("avg_memory_mb", 0)
         print(f"Fixed Resource - Agent: {agent_name}, Memory: {memory_value}")
@@ -446,7 +641,6 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
     with open(metrics_path, 'w') as f:
         json.dump(metrics, f, indent=2)
     
-    # メトリクスJSONの内容を確認するためのデバッグ出力
     print(f"Generated metrics file: {metrics_path}")
     print("Resource usage data sample:")
     for agent, data in list(metrics["resource_usage"].items())[:2]:
@@ -454,59 +648,82 @@ def convert_integrated_report_for_pareto(integrated_report_path, output_dir="./a
 
     return metrics_path
 
-def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5, show_size_values=False):
-    report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
-    if not report_files:
-        print("No integrated evaluation report found.")
-        return False
+def run_pareto_analysis(evaluation_dir, output_dir=None, n_latest=5, show_size_values=False, use_multiple_experiments=False):
+    """
+    Run Pareto analysis on evaluation data
     
-    latest_report = max(report_files, key=os.path.getctime)
-    print(f"Using latest report: {latest_report}")
-    
-    adapted_dir = os.path.join(evaluation_dir, "adapted_data")
-    metrics_path = convert_integrated_report_for_pareto(latest_report, adapted_dir)
-    
-    with open(metrics_path, 'r') as f:
-        metrics_data = json.load(f)
-    
-    agent_data = []
-    for agent_name, metrics in metrics_data.get("agent_performance", {}).items():
-        resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
+    Args:
+        evaluation_dir: Directory containing evaluation data
+        output_dir: Directory to save visualizations
+        n_latest: Number of latest experiments to analyze (for traditional mode)
+        show_size_values: Whether to show size values on plots
+        use_multiple_experiments: Whether to use multiple experiment mode
         
-        win_rate = metrics.get("win_rate", 0) * 100
-        avg_time = metrics.get("avg_time_ms", 0)
-        memory_mb = resource_usage.get("avg_memory_mb", 0)
-        
-        print(f"Agent {agent_name}: Win rate = {win_rate}%, Memory = {memory_mb} MB")
-        
-        agent_data.append({
-            "Agent": agent_name,
-            "Win Rate (%)": win_rate,
-            "Avg Time (ms)": avg_time,
-            "Memory (MB)": memory_mb,
-            "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
-            "n_samples": 1 
-        })
+    Returns:
+        bool: Success flag
+    """
+    if evaluation_dir.startswith('./') or evaluation_dir.startswith('../'):
+        project_root = find_project_root()
+        if evaluation_dir == './evaluations':
+            evaluation_dir = os.path.join(project_root, 'evaluations')
+            print(f"Using project root evaluations directory: {evaluation_dir}")
     
-    df = pd.DataFrame(agent_data)
-    
-    # メモリが0の場合、最小値を0.1に設定してグラフで見えるようにする
-    df.loc[df["Memory (MB)"] == 0, "Memory (MB)"] = 0.1
-    
-    if output_dir is None:
-        output_dir = os.path.join(evaluation_dir, "analysis")
+    if use_multiple_experiments:
+        print("Using multiple experiments mode for Pareto analysis")
+        df = aggregate_experiment_data(evaluation_dir, n_latest, use_multiple_experiments=True)
 
-    create_2d_pareto_analysis(df, output_dir, show_size_values)
-    create_3d_visualization(df, output_dir)
-    create_radar_chart(df, output_dir)
-    print(f"Pareto analysis completed. Visualizations saved to: {output_dir}")
-    return True
+    else:
+        report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
+
+        
+        latest_report = max(report_files, key=os.path.getctime)
+        print(f"Using latest report: {latest_report}")
+        
+        adapted_dir = os.path.join(evaluation_dir, "adapted_data")
+        metrics_path = convert_integrated_report_for_pareto(latest_report, adapted_dir)
+        
+        with open(metrics_path, 'r') as f:
+            metrics_data = json.load(f)
+        
+        agent_data = []
+        for agent_name, metrics in metrics_data.get("agent_performance", {}).items():
+            resource_usage = metrics_data.get("resource_usage", {}).get(agent_name, {})
+            
+            win_rate = metrics.get("win_rate", 0) * 100
+            avg_time = metrics.get("avg_time_ms", 0)
+            memory_mb = resource_usage.get("avg_memory_mb", 0)
+            
+            print(f"Agent {agent_name}: Win rate = {win_rate}%, Memory = {memory_mb} MB")
+            
+            agent_data.append({
+                "Agent": agent_name,
+                "Win Rate (%)": win_rate,
+                "Avg Time (ms)": avg_time,
+                "Memory (MB)": memory_mb,
+                "CPU (%)": resource_usage.get("avg_cpu_percent", 0),
+                "n_samples": 1 
+            })
+        
+        df = pd.DataFrame(agent_data)
+    
+    if df is not None and not df.empty:
+        df.loc[df["Memory (MB)"] == 0, "Memory (MB)"] = 0.1
+        
+        if output_dir is None:
+            output_dir = os.path.join(evaluation_dir, "analysis")
+
+        create_2d_pareto_analysis(df, output_dir, show_size_values)
+        create_3d_visualization(df, output_dir)
+        create_radar_chart(df, output_dir)
+        print(f"Pareto analysis completed. Visualizations saved to: {output_dir}")
+        return True
+    
+    print("No valid data for Pareto analysis.")
+    return False
+
 
 def run_adapted_pareto_analysis(evaluation_dir="./evaluations", show_size_values=False):
     report_files = glob.glob(os.path.join(evaluation_dir, "integrated_evaluation_report_*.json"))
-    if not report_files:
-        print("No integrated evaluation report found.")
-        return False
     
     latest_report = max(report_files, key=os.path.getctime)
     
@@ -541,23 +758,49 @@ if __name__ == "__main__":
     import sys
     
     def find_latest_experiment():
-        log_dirs = sorted([d for d in os.listdir("./logs") if d.startswith("experiment_")])
-        if not log_dirs:
-            return None
-        return os.path.join("./logs", log_dirs[-1])
+        project_root = find_project_root()
+        log_dir = os.path.join(project_root, "logs")
+        
+        if os.path.exists(log_dir):
+            log_dirs = sorted([d for d in os.listdir(log_dir) if d.startswith("experiment_")])
+            if not log_dirs:
+                return None
+            return os.path.join(log_dir, log_dirs[-1])
+        return None
     
     import argparse
     parser = argparse.ArgumentParser(description='pareto analysis')
     parser.add_argument('--dir', type=str, default="./evaluations", help='target experiment directory')
-    parser.add_argument('--n_latest', type=int, default=5, help='number of latest experiments to analyze')
-    parser.add_argument('--output', type=str, default="./evaluations/analysis", help='output directory for plots')
+    parser.add_argument('--n_latest', type=int, default=6, help='number of latest experiments to analyze')
+    parser.add_argument('--output', type=str, default=None, help='output directory for plots')
     parser.add_argument('--show-size-values', action='store_true', help='show additional metric values on plots')
+    parser.add_argument('--multiple', action='store_true', help='use multiple experiments data integration')
     
     args = parser.parse_args()
-    results_dir = args.dir if args.dir else find_latest_experiment()
     
-    if not results_dir:
-        print("not found experiment directory")
+    project_root = find_project_root()
+    
+    if args.dir == "./evaluations":
+        results_dir = os.path.join(project_root, "evaluations")
+    else:
+        results_dir = args.dir if args.dir else find_latest_experiment()
+    
+    if args.output is None:
+        output_dir = os.path.join(results_dir, "analysis")
+    else:
+        output_dir = args.output
+    
+    
+    success = run_pareto_analysis(
+        results_dir, 
+        output_dir, 
+        args.n_latest, 
+        args.show_size_values,
+        args.multiple
+    )
+    
+    if success:
+        print(f"Pareto analysis completed successfully. Results saved to: {output_dir}")
+    else:
+        print("Pareto analysis failed.")
         sys.exit(1)
-    
-    success = run_pareto_analysis(results_dir, args.output, args.n_latest, args.show_size_values)

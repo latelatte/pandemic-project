@@ -496,6 +496,28 @@ def integrate_experiment_data(all_experiments_data):
     return integrated_data
 
 
+def format_cnp_value(value):
+    """
+    CNP値を適切な形式でフォーマットする
+    
+    Args:
+        value: フォーマットするCNP値
+        
+    Returns:
+        str: フォーマットされた文字列
+    """
+    # 値が0に近い場合は0表示
+    if abs(value) < 1e-10:
+        return "0"
+    
+    # 値の絶対値が大きいまたは小さい場合は指数表記
+    if abs(value) >= 1e4 or abs(value) < 0.01:
+        return f"{value:.2e}"
+    
+    # それ以外は小数点表記
+    return f"{value:.2f}"
+
+
 def create_cnp_visualization(data, output_dir):
     """
     Create CNP visualizations
@@ -569,7 +591,7 @@ def create_cnp_visualization(data, output_dir):
                         (row["Avg Time (ms)"], row["Memory (MB)"]),
                         xytext=(5, 5),
                         textcoords="offset points",
-                        fontsize=9
+                        fontsize=12
                     )
                     
                     # Add episode count annotation with error checking
@@ -579,7 +601,7 @@ def create_cnp_visualization(data, output_dir):
                         (row["Avg Time (ms)"], row["Memory (MB)"]),
                         xytext=(5, -10),
                         textcoords="offset points",
-                        fontsize=8,
+                        fontsize=12,
                         alpha=0.7
                     )
     
@@ -614,6 +636,7 @@ def create_cnp_visualization(data, output_dir):
     
     # 2. Create CNP comparison chart - Both linear and log scale versions
     unique_agents = df["Agent"].unique()
+    display_agents = [agent.replace('Agent', '') for agent in unique_agents]
     
     # 2.1 Linear scale version
     plt.figure(figsize=(10, 6))
@@ -637,17 +660,19 @@ def create_cnp_visualization(data, output_dir):
             width=bar_width, color='salmon', label='Fixed Resource')
         
     for i, value in enumerate(cnp_df["Fixed Episodes CNP"]):
-        plt.text(i - bar_width/2, value + 0.1, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9)
+        plt.text(i - bar_width/2, value + 0.1, 
+                format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
     for i, value in enumerate(cnp_df["Fixed Resource CNP"]):
-        plt.text(i + bar_width/2, value + 0.1, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9)
+        plt.text(i + bar_width/2, value + 0.1, 
+                format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
     
     plt.xlabel("Agent", fontsize=12)
     plt.ylabel("CNP Value", fontsize=12)
     plt.title("Cost-Normalized Performance Comparison (Linear Scale)", fontsize=16)
-    plt.xticks(x, unique_agents)
-    plt.legend()
+    plt.xticks(x, display_agents)
+    plt.legend(fontsize=14)
     plt.grid(True, axis='y', linestyle='--', alpha=0.7)
     for i, ratio in enumerate(cnp_df["CNP Ratio"]):
         plt.annotate(
@@ -663,7 +688,7 @@ def create_cnp_visualization(data, output_dir):
     plt.savefig(os.path.join(output_dir, "cnp_comparison_linear.png"), dpi=300)
     plt.close()
     
-    # 2.2 Log scale version
+    # 2.2 Log scale version - CNP値の表示を修正
     plt.figure(figsize=(10, 6))
     bars1 = plt.bar(x - bar_width/2, cnp_df["Fixed Episodes CNP"], 
             width=bar_width, color='skyblue', label='Fixed Episodes')
@@ -671,22 +696,24 @@ def create_cnp_visualization(data, output_dir):
             width=bar_width, color='salmon', label='Fixed Resource')
     for i, value in enumerate(cnp_df["Fixed Episodes CNP"]):
         y_pos = max(value * 1.1, 0.1)
-        plt.text(i - bar_width/2, y_pos, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9, rotation=0,
+        plt.text(i - bar_width/2, y_pos, 
+                format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12, rotation=0,
                 bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
                 
     for i, value in enumerate(cnp_df["Fixed Resource CNP"]):
         y_pos = max(value * 1.1, 0.1)
-        plt.text(i + bar_width/2, y_pos, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9, rotation=0,
+        plt.text(i + bar_width/2, y_pos, 
+                format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12, rotation=0,
                 bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
     
-    plt.xlabel("Agent", fontsize=12)
-    plt.ylabel("CNP Value (log scale)", fontsize=12)
+    plt.xlabel("Agent", fontsize=14)
+    plt.ylabel("CNP Value (log scale)", fontsize=14)
     plt.title("Cost-Normalized Performance Comparison (Log Scale)", fontsize=16)
     plt.yscale('log')
-    plt.xticks(x, unique_agents)
-    plt.legend()
+    plt.xticks(x, display_agents)
+    plt.legend(fontsize=14)
     plt.grid(True, axis='y', linestyle='--', alpha=0.7)
     for i, ratio in enumerate(cnp_df["CNP Ratio"]):
         y_min, y_max = plt.ylim()
@@ -697,19 +724,19 @@ def create_cnp_visualization(data, output_dir):
             xytext=(0, 10),
             textcoords="offset points",
             ha='center',
-            fontsize=9,
+            fontsize=12,
             bbox=dict(boxstyle="round,pad=0.3", fc='lightyellow', alpha=0.7)
         )
     plt.figtext(0.01, 0.01, "Note: Y-axis uses logarithmic scale for better visibility", 
-                fontsize=8, style='italic')
+                fontsize=12, style='italic')
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "cnp_comparison.png"), dpi=300)
     plt.close()
     
     # 3. Create win rate vs. episode count chart for fixed resource evaluation
     resource_df = pd.DataFrame(df_resource)
+    resource_df['Agent'] = resource_df['Agent'].apply(lambda x: x.replace('Agent', ''))
     
-    # 図のサイズを少し大きくして、タイトルが見切れないようにする
     plt.figure(figsize=(12, 8))
     
     scatter = sns.scatterplot(
@@ -724,21 +751,22 @@ def create_cnp_visualization(data, output_dir):
     if scatter.get_legend():
         scatter.get_legend().remove()
     
-    plt.legend(title="Agent", loc="best", framealpha=0.9)
+    plt.legend(title="Agent", loc="best", framealpha=0.9, title_fontsize=12, fontsize=10)
 
     for i, row in resource_df.iterrows():
         plt.annotate(
-            f"CNP: {row['CNP']:.3f}", 
+            f"CNP: {format_cnp_value(row['CNP'])}", 
             (row["Episodes"], row["Win Rate (%)"]),
             xytext=(10, 8),
             textcoords="offset points",
-            fontsize=9,
+            fontsize=12,
             bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7)
         )
     
-    plt.xlabel("Episodes Completed Under Resource Constraint", fontsize=12)
-    plt.ylabel("Win Rate (%)", fontsize=12)
+    plt.xlabel("Episodes Completed Under Resource Constraint", fontsize=14)
+    plt.ylabel("Win Rate (%)", fontsize=14)
     plt.title("Fixed Resource Evaluation: Win Rate vs. Episode Count", fontsize=16, pad=20)
+    plt.tick_params(axis='both', labelsize=12)
     plt.grid(True, linestyle='--', alpha=0.7)
     
     plt.tight_layout(rect=[0, 0, 1, 0.96])
@@ -754,40 +782,41 @@ def create_cnp_visualization(data, output_dir):
     bars2 = ax_main.bar(x + bar_width/2, cnp_df["Fixed Resource CNP"], 
             width=bar_width, color='salmon', label='Fixed Resource')
     for i, value in enumerate(cnp_df["Fixed Episodes CNP"]):
-        y_pos = max(value * 1.1, 0.1)
-        ax_main.text(i - bar_width/2, y_pos, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9)
+        y_pos = max(value * 1.01, 0.01)
+        ax_main.text(i - bar_width/2, y_pos, format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
     for i, value in enumerate(cnp_df["Fixed Resource CNP"]):
-        y_pos = max(value * 1.1, 0.1)
-        ax_main.text(i + bar_width/2, y_pos, f"{value:.1f}", 
-                ha='center', va='bottom', fontsize=9)
-    ax_main.set_xlabel("Agent", fontsize=12)
-    ax_main.set_ylabel("CNP Value (log scale)", fontsize=12)
-    ax_main.set_title("Full Comparison (Log Scale)", fontsize=14)
+        y_pos = max(value * 1.01, 0.01)
+        ax_main.text(i + bar_width/2, y_pos, format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
+    ax_main.set_xlabel("Agent", fontsize=14)
+    ax_main.set_ylabel("CNP Value (log scale)", fontsize=14)
+    ax_main.set_title("Full Comparison (Log Scale)", fontsize=16)
     ax_main.set_yscale('log')
     ax_main.set_xticks(x)
-    ax_main.set_xticklabels(unique_agents)
-    ax_main.legend()
+    ax_main.set_xticklabels(display_agents)
+    ax_main.legend(fontsize=14)
     ax_main.grid(True, axis='y', linestyle='--', alpha=0.7)
     max_cnp_idx = cnp_df["Fixed Episodes CNP"].idxmax()
     max_agent = cnp_df.iloc[max_cnp_idx]["Agent"]
     ax_detail = plt.subplot(gs[1])
     detail_df = cnp_df[cnp_df["Agent"] != max_agent].reset_index(drop=True)
+    dis_agents = [i.replace('Agent', '')for i in detail_df["Agent"]]
     detail_x = np.arange(len(detail_df))
     bars3 = ax_detail.bar(detail_x - bar_width/2, detail_df["Fixed Episodes CNP"], 
             width=bar_width, color='skyblue')
     bars4 = ax_detail.bar(detail_x + bar_width/2, detail_df["Fixed Resource CNP"], 
             width=bar_width, color='salmon')
     for i, value in enumerate(detail_df["Fixed Episodes CNP"]):
-        ax_detail.text(i - bar_width/2, value * 1.05, f"{value:.2f}", 
-                ha='center', va='bottom', fontsize=8)
+        ax_detail.text(i - bar_width/2, value * 1.02, format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
     for i, value in enumerate(detail_df["Fixed Resource CNP"]):
-        ax_detail.text(i + bar_width/2, value * 1.05, f"{value:.2f}", 
-                ha='center', va='bottom', fontsize=8)
-    ax_detail.set_xlabel("Agent", fontsize=10)
+        ax_detail.text(i + bar_width/2, value * 1.02, format_cnp_value(value), 
+                ha='center', va='bottom', fontsize=12)
+    ax_detail.set_xlabel("Agent", fontsize=14)
     ax_detail.set_title(f"Detail View (Without {max_agent})", fontsize=14)
     ax_detail.set_xticks(detail_x)
-    ax_detail.set_xticklabels(detail_df["Agent"])
+    ax_detail.set_xticklabels(dis_agents)
     ax_detail.grid(True, axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "cnp_comparison_breakdown.png"), dpi=300)
@@ -815,7 +844,7 @@ def create_cnp_visualization(data, output_dir):
             (row["Avg Time (ms)"], row["Memory (MB)"]),
             xytext=(5, 5),
             textcoords="offset points",
-            fontsize=8
+            fontsize=12
         )
     
     ax_main.set_xlabel("Average Decision Time (ms)", fontsize=12)
@@ -830,28 +859,21 @@ def create_cnp_visualization(data, output_dir):
     ax_time = plt.subplot(gs[0, 0], sharex=ax_main)
     
     df["Time Efficiency"] = df["Win Rate (%)"] / df["Avg Time (ms)"]
-    
-    # Time Efficiencyグラフを対数スケールに変更し、全エージェントを表示
-    ax_time.set_yscale('log')  # 対数スケールを適用
-    
-    # エージェントごとにグループ化して横並びに表示するよう調整
+
+    ax_time.set_yscale('log')
+
     n_agents = len(unique_agents)
     
-    # エージェントの表示位置を決定するオフセット
     time_offsets = {}
     
     for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
-        
-        # 各エージェントデータの平均時間を計算して基準位置を求める
+
         if not agent_data.empty:
             time_val = agent_data["Avg Time (ms)"].mean()
             time_offsets[agent] = time_val
+    fixed_width = 0.3
     
-    # 全バーで使用する固定幅の計算（対数スケール上で適切に見えるサイズ）
-    fixed_width = 0.3  # 固定幅
-    
-    # 固定エピソードと固定リソースを横並びに表示
     for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
         
@@ -859,18 +881,15 @@ def create_cnp_visualization(data, output_dir):
             eval_data = agent_data[agent_data["Evaluation"] == eval_type]
             
             if not eval_data.empty:
-                # 基準位置からオフセットを計算
                 time_val = time_offsets[agent]
-                # 評価タイプによって左右にずらす
                 offset = 0.7 if j == 0 else 1.3
-                
-                # 対数スケールなので値が0の場合に備える
+
                 efficiency = max(eval_data["Time Efficiency"].iloc[0], 1e-10)
                 
                 bar = ax_time.bar(
                     time_val * offset,
                     efficiency,
-                    width=fixed_width * time_val,  # 幅は固定係数と時間の積
+                    width=fixed_width * time_val, 
                     color=color_map[agent],
                     alpha=0.7 if eval_type == "Fixed Episodes" else 0.4,
                     label=f"{agent} ({eval_type})" if i == 0 else None
@@ -885,19 +904,15 @@ def create_cnp_visualization(data, output_dir):
     
     df["Memory Efficiency"] = df["Win Rate (%)"] / df["Memory (MB)"]
     
-    # Memory Efficiencyグラフを横並びに表示
-    # エージェントの表示位置を決定するオフセット
     memory_offsets = {}
     
     for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
-        
-        # 各エージェントデータの平均メモリを計算して基準位置を求める
+
         if not agent_data.empty:
             memory_val = agent_data["Memory (MB)"].mean()
             memory_offsets[agent] = memory_val
     
-    # 固定エピソードと固定リソースを横並びに表示
     for i, agent in enumerate(unique_agents):
         agent_data = df[df["Agent"] == agent]
         
@@ -905,16 +920,13 @@ def create_cnp_visualization(data, output_dir):
             eval_data = agent_data[agent_data["Evaluation"] == eval_type]
             
             if not eval_data.empty:
-                # 基準位置からオフセットを計算
                 memory_val = memory_offsets[agent]
-                # 評価タイプによって左右にずらす
                 offset = 0.7 if j == 0 else 1.3
-                
-                # 高さを固定値に設定
+
                 fixed_height = memory_val * 0.2
                 
                 ax_memory.barh(
-                    memory_val * offset,  # オフセットを適用して横並び
+                    memory_val * offset,
                     eval_data["Memory Efficiency"].iloc[0],
                     height=fixed_height,
                     color=color_map[agent],
@@ -934,24 +946,24 @@ def create_cnp_visualization(data, output_dir):
     legend_x = 0.1
     
 
-    ax_legend.text(0.5, legend_y_start, "Agents:", fontsize=10, fontweight='bold', ha='center')
+    ax_legend.text(0.5, legend_y_start, "Agents:", fontsize=12, fontweight='bold', ha='center')
     
     for i, agent in enumerate(unique_agents):
         y_pos = legend_y_start - (i+1)*legend_y_step
         ax_legend.add_patch(Rectangle((legend_x, y_pos), 0.2, 0.1, color=color_map[agent]))
-        ax_legend.text(legend_x + 0.25, y_pos + 0.05, agent, fontsize=9, va='center')
+        disp_agent = agent.replace('Agent', '')
+        ax_legend.text(legend_x + 0.25, y_pos + 0.05, disp_agent, fontsize=10, va='center')
     
     eval_y_start = legend_y_start - (len(unique_agents)+1)*legend_y_step
-    ax_legend.text(0.5, eval_y_start, "Evaluation Types:", fontsize=10, fontweight='bold', ha='center')
-    
-    # 評価方法の透明度の違いを明示する凡例
+    ax_legend.text(0.5, eval_y_start, "Evaluation Types:", fontsize=12, fontweight='bold', ha='center')
+
     fe_y = eval_y_start - legend_y_step
     ax_legend.add_patch(Rectangle((legend_x, fe_y), 0.2, 0.1, color=color_map[agent], alpha=0.7))
-    ax_legend.text(legend_x + 0.25, fe_y + 0.05, "Fixed Episodes", fontsize=9, va='center')
+    ax_legend.text(legend_x + 0.25, fe_y + 0.05, "Fixed Episodes", fontsize=10, va='center')
     
     fr_y = eval_y_start - 2*legend_y_step
     ax_legend.add_patch(Rectangle((legend_x, fr_y), 0.2, 0.1, color=color_map[agent], alpha=0.4))
-    ax_legend.text(legend_x + 0.25, fr_y + 0.05, "Fixed Resource", fontsize=9, va='center')
+    ax_legend.text(legend_x + 0.25, fr_y + 0.05, "Fixed Resource", fontsize=10, va='center')
     
 
     
@@ -961,7 +973,7 @@ def create_cnp_visualization(data, output_dir):
     plt.close()
     
     # 5. Create statistical comparison chart
-    plt.figure(figsize=(12, 8))  # 元のサイズに戻す (14, 10)から(12, 8)へ
+    plt.figure(figsize=(12, 8)) 
     
     stats_data = []
     
@@ -1063,12 +1075,12 @@ def create_cnp_visualization(data, output_dir):
             yerr=res_yerr,
             color='salmon', label='Fixed Resource', capsize=5)
     
-    # 各バーの上に勝率のラベルを追加
+    #* タイトルフォントサイズ
     for i, row in stats_df.iterrows():
-        plt.text(x[i] - width/2, row["Fixed Episodes Win"] + ep_yerr[1][i] + 0.1, 
-                f"{row['Fixed Episodes Win']:.2f}%", ha='center', va='bottom', fontsize=9)
-        plt.text(x[i] + width/2, row["Fixed Resource Win"] + res_yerr[1][i] + 0.1, 
-                f"{row['Fixed Resource Win']:.2f}%", ha='center', va='bottom', fontsize=9)
+        plt.text(x[i] - width/2, row["Fixed Episodes Win"] + ep_yerr[1][i] + 0.01, 
+                f"{row['Fixed Episodes Win']:.2f}%", ha='center', va='bottom', fontsize=16)
+        plt.text(x[i] + width/2, row["Fixed Resource Win"] + res_yerr[1][i] + 0.01, 
+                f"{row['Fixed Resource Win']:.2f}%", ha='center', va='bottom', fontsize=16)
     
     for i, row in stats_df.iterrows():
         significance = ""
@@ -1095,24 +1107,22 @@ def create_cnp_visualization(data, output_dir):
             effect_text = "Large"
             
         plt.text(x[i], 5, f"d={effect_size:.2f}\n({effect_text})", 
-                ha='center', va='center', fontsize=8,
+                ha='center', va='center', fontsize=12, #*効果量フォントサイズ
                 bbox=dict(boxstyle="round,pad=0.3", fc='lightyellow', alpha=0.7))
     
-    plt.xlabel("Agent", fontsize=12)
-    plt.ylabel("Win Rate (%)", fontsize=12)
+
+    plt.ylabel("Win Rate (%)", fontsize=14)
     plt.title("Statistical Comparison with 95% Confidence Intervals", fontsize=16)
-    plt.xticks(x, unique_agents)
-    plt.legend()
+    plt.xticks(x, display_agents)
+    plt.legend(fontsize=14)
     plt.grid(True, axis='y', linestyle='--', alpha=0.7)
     
-    # エラーバーに関する説明を追加
     if "statistics" in data:
         plt.figtext(0.01, 0.01, 
                 "Error bars represent 95% confidence intervals based on multiple experiments", 
-                fontsize=10, style='italic')
+                fontsize=14, style='italic')
     
-    # レイアウト調整を簡素化
-    plt.tight_layout()  # 複雑な余白調整をシンプルに
+    plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "statistical_comparison.png"), dpi=300)
     plt.close()
     
