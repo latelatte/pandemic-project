@@ -159,15 +159,6 @@ def main():
             "seed": args.seed,
             "timestamp": datetime.now().isoformat()
         }, f, indent=2)
-    
-    if args.visualize:
-        #print("visualizing results...")
-        from visualization.performance_charts import create_performance_charts
-        from visualization.learning_curves import create_learning_curves
-        
-        create_performance_charts(log_dir, os.path.join(log_dir, "plots"))
-        create_learning_curves(log_dir, os.path.join(log_dir, "plots"))
-        #print(f"images saved to {log_dir}/plots")
 
 if __name__ == "__main__":
     if check_config_files():
