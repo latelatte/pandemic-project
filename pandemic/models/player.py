@@ -187,12 +187,10 @@ class Player:
         """
         Build a research station in the current city
         """
-        # すでに研究所がある場合は何もしない
         if self.city.has_research_station:
             print(f"{self.city.name} already has a research station")
             return False
         
-        # カードが指定されていなければ手札から適切なカードを探す
         if card is None:
             for c in self.hand:
                 if (hasattr(c, 'city_name') and c.city_name == self.city.name) or \
@@ -200,17 +198,13 @@ class Player:
                     card = c
                     break
         
-        # Operations Expert役職の確認
         is_ops_expert = False
         if hasattr(self, 'role') and hasattr(self.role, 'name'):
             is_ops_expert = self.role.name == "Operations Expert"
         
-        # カードを使用するか、OpsExpertの能力で建設
         if card:
-            # カード属性の存在チェック
             if ((hasattr(card, 'city_name') and card.city_name == self.city.name) or
                (hasattr(card, 'city') and hasattr(card.city, 'name') and card.city.name == self.city.name)):
-                # カードを捨て札に
                 self.hand.remove(card)
                 self.simulation.player_discard_pile.append(card)
                 self.city.has_research_station = True
@@ -218,7 +212,6 @@ class Player:
                 return True
             return False
         elif is_ops_expert:
-            # OpsExpertは市のカードなしで建設可能
             self.city.has_research_station = True
             print(f"{self.name} (Operations Expert) built a research station at {self.city.name}")
             return True

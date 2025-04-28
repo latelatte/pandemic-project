@@ -126,42 +126,6 @@ class SimulationRunner:
         import pandemic.agents.mcts_agent as mcts
         import pandemic.agents.marl_agent as marl
         
-        # try:
-        #     if hasattr(ea, "_global_ea_agent") and ea._global_ea_agent:
-        #         state_file = os.path.join(agent_state_dir, "eaagent_state.pkl")
-        #         ea._global_ea_agent.save_state(state_file)
-        #         print(f"Saved EA agent state to {state_file}")
-
-        #         backup_file = os.path.join(self.logger.log_dir, "eaagent_state.pkl")
-        #         ea._global_ea_agent.save_state(backup_file)
-            
-        #     if hasattr(mcts, "_global_mcts_agent") and mcts._global_mcts_agent:
-        #         state_file = os.path.join(agent_state_dir, "mcts_gent_state.pkl")
-        #         mcts._global_mcts_agent.save_state(state_file)
-        #         print(f"Saved MCTS agent state to {state_file}")
-
-        #         backup_file = os.path.join(self.logger.log_dir, "mctsagent_state.pkl")
-        #         mcts._global_mcts_agent.save_state(backup_file)
-            
-        #     if hasattr(marl, "_global_marl_agent") and marl._global_marl_agent:
-        #         state_file = os.path.join(agent_state_dir, "marlagent_state.pt")
-        #         marl._global_marl_agent.save_state(state_file)
-        #         print(f"Saved MARL agent state to {state_file}")
-
-        #         # backup_file = os.path.join(self.logger.log_dir, "marlagent_state.pt")
-        #         # marl._global_marl_agent.save_state(backup_file)
-        
-        
-        #     self.print_summary()
-            
-        #     # self.convergence_detector = ConvergenceDetector()
-        #     # if self.convergence_detector.update(win, ep):
-        #     #     print(f"Convergence detected at episode {ep} after {self.convergence_detector.convergence_time:.2f} seconds") 
-        
-        # except Exception as e:
-        #     print(f"Error saving agent states: {e}")
-        #     import traceback
-        #     traceback.print_exc()
 
         
         

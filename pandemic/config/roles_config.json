@@ -2,42 +2,42 @@
   "roles": [
     {
       "name": "Medic",
-      "description": "治療効果が通常の2倍", 
+      "description": "Twice as effective as usual in treatment.", 
       "abilities": {
         "treat_disease": {"cubes_removed": 2}
       }
     },
     {
       "name": "Scientist", 
-      "description": "治療薬開発に必要なカードが4枚に減少",
+      "description": "Cards required to develop a cure reduced to four.",
       "abilities": {
         "develop_cure": {"cards_required": 4}
       }
     },
     {
       "name": "Operations Expert",
-      "description": "どの都市でも研究所を建設可能", 
+      "description": "Laboratories can be built in any city.", 
       "abilities": {
         "build_research_station": {"any_card": true}
       }
     },
     {
       "name": "Researcher",
-      "description": "知識共有の制約が緩和", 
+      "description": "Constraints on knowledge sharing eased.", 
       "abilities": {
         "share_knowledge": {"flexible": true}
       }
     },
     {
       "name": "Dispatcher",
-      "description": "他プレイヤーの移動を補助可能",
+      "description": "Can assist the movement of other players.",
       "abilities": {
         "move_player": {"can_move_others": true}
       }
     },
     {
       "name": "Quarantine Specialist",
-      "description": "現在地と隣接都市での感染を防止",
+      "description": "Prevent infection at the current location and in neighbouring cities.",
       "abilities": {
         "prevent_infection": {"radius": 1}
       }

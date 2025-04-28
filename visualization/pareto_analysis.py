@@ -7,6 +7,14 @@ import os
 import json
 import glob
 
+TITLE_SIZE = 22 + 2
+LABEL_SIZE = 20 + 2
+TICK_SIZE = 18 + 2
+LEGEND_SIZE = 18 + 2
+ANNOTATION_SIZE = 18 + 2
+SMALL_ANNOTATION_SIZE = 16 + 2
+FIG_TEXT_SIZE = 13 + 2
+
 def find_project_root():
     """
     プロジェクトルートディレクトリを自動検出する
@@ -14,23 +22,16 @@ def find_project_root():
     Returns:
         str: プロジェクトルートのパス
     """
-    # 現在のスクリプトの絶対パス
     current_path = os.path.abspath(__file__)
     
-    # 現在のスクリプトのディレクトリ
     current_dir = os.path.dirname(current_path)
     
-    # 親ディレクトリ (おそらくプロジェクトルート)
     parent_dir = os.path.dirname(current_dir)
     
-    # プロジェクトルートの検証 (evaluationsディレクトリが存在するか確認)
     if os.path.exists(os.path.join(parent_dir, "evaluations")):
         print(f"Found project root: {parent_dir}")
         return parent_dir
     
-    # evaluationsが見つからない場合は、現在のディレクトリを返す (フォールバック)
-    print(f"Project root not detected. Using current directory: {current_dir}")
-    return current_dir
 
 def load_agent_data(results_dir):
     """load agent performance data from JSON file"""
@@ -64,17 +65,13 @@ def load_agent_data(results_dir):
 
 def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="experiment_*", use_multiple_experiments=False):
     """create a DataFrame from multiple experiment directories"""
-    # 相対パスが指定された場合はプロジェクトルートを考慮
     if results_dir.startswith('./') or results_dir.startswith('../'):
         project_root = find_project_root()
-        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
         if results_dir == './evaluations':
             results_dir = os.path.join(project_root, 'evaluations')
             print(f"Using project root evaluations directory: {results_dir}")
     
-    # ディレクトリパスを絶対パスに変換して存在確認
     results_dir = os.path.abspath(results_dir)
-    print(f"Using base directory: {results_dir}")
     
     if not os.path.exists(results_dir):
         print(f"Error: Directory '{results_dir}' does not exist.")
@@ -82,41 +79,32 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
 
     if os.path.isdir(results_dir) and not results_dir.endswith("logs"):
         if use_multiple_experiments:
-            # 複数実験モード：指定ディレクトリ内のすべての評価レポートを検索
-            print("Using multiple experiments mode")
             report_files = []
             
-            # 直接ディレクトリ内のレポートを探す
             integrated_reports = glob.glob(os.path.join(results_dir, "integrated_evaluation_report_*.json"))
             evaluation_reports = glob.glob(os.path.join(results_dir, "*evaluation_report_*.json"))
             
-            # 「integrated」を含むレポートを除外（単一実験用）
             evaluation_reports = [f for f in evaluation_reports if "integrated" not in os.path.basename(f).lower()]
             
-            # 両方のリストを統合
             report_files.extend(integrated_reports)
             report_files.extend(evaluation_reports)
             
-            # サブディレクトリも探索
             for root, dirs, files in os.walk(results_dir):
-                # 現在のディレクトリがresults_dirそのものでない場合のみ処理
                 if root != results_dir:
                     for file in files:
                         if file.endswith(".json") and "evaluation_report" in file:
                             report_files.append(os.path.join(root, file))
             
-            # 重複を削除
             report_files = list(set(report_files))
             
             print(f"Found {len(report_files)} evaluation reports:")
-            for report_file in report_files[:5]:  # 最初の5つだけ表示
+            for report_file in report_files[:5]:
                 print(f"  - {os.path.basename(report_file)}")
             if len(report_files) > 5:
                 print(f"  ... and {len(report_files) - 5} more")
             
-            experiment_dirs = [results_dir]  # 直接results_dirを使用
+            experiment_dirs = [results_dir]
         else:
-            # 単一実験モード：従来通りの処理
             experiment_dirs = [results_dir]
     else:
         base_dir = results_dir if results_dir.endswith("logs") else "./logs"
@@ -126,7 +114,6 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
     
     all_agent_data = {}
     
-    # 複数実験モードの場合は、各レポートファイルを直接処理
     if use_multiple_experiments and 'report_files' in locals():
         for report_file in report_files:
             try:
@@ -135,10 +122,8 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
                 with open(report_file, 'r') as f:
                     data = json.load(f)
                 
-                # 固定エピソードと固定リソースの両方のデータを処理
                 for eval_type in ["fixed_episodes_results", "fixed_resource_results"]:
                     for agent_name, metrics in data.get(eval_type, {}).items():
-                        # エージェント名に評価タイプを追加 - 明確な表記に修正
                         eval_display_name = "Fixed Episodes" if "episodes" in eval_type else "Fixed Resource"
                         qualified_agent_name = f"{agent_name} ({eval_display_name})"
                         
@@ -147,7 +132,6 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
                                 "win_rates": [], "times": [], "memory": [], "cpu": []
                             }
                         
-                        # この実験のデータを集約
                         win_rate = metrics.get("win_rate", 0) * 100
                         
                         agent_perf = metrics.get("agent_performance", {}).get(agent_name, {})
@@ -167,19 +151,15 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
             except Exception as e:
                 print(f"Error occurred in processing {report_file}: {e}")
     else:
-        # 従来の方法で実験ディレクトリを処理
         for exp_dir in experiment_dirs:
-            # パスの構築を修正：正確なJSONファイルのパスを取得
             metrics_files = glob.glob(os.path.join(exp_dir, "*.json"))
             if not metrics_files:
-                # 評価ディレクトリ内を探す
                 metrics_files = glob.glob(os.path.join(exp_dir, "evaluations", "*.json"))
                 
             if not metrics_files:
                 print(f"WARN: No JSON metrics files found in {exp_dir}")
                 continue
                 
-            # 最新のメトリクスファイルを使用
             metrics_file = max(metrics_files, key=os.path.getctime)
             print(f"Processing metrics file: {metrics_file}")
                 
@@ -215,7 +195,6 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
         if not data["win_rates"]:
             continue
             
-        # 各エージェントのデータをデバッグ表示
         print(f"Agent {agent_name} data from all experiments:")
         for i, win_rate in enumerate(data["win_rates"]):
             print(f"  Experiment {i+1}: Win Rate = {win_rate:.2f}%, Time = {data['times'][i]:.2f}ms, Memory = {data['memory'][i]:.2f}MB")
@@ -235,7 +214,6 @@ def aggregate_experiment_data(results_dir="./evaluations", n_latest=5, pattern="
     
     df = pd.DataFrame(aggregated_data) if aggregated_data else None
     
-    # 統計情報の表示
     if df is not None:
         print("\nAggregate Statistics:")
         for _, row in df.iterrows():
@@ -270,34 +248,48 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
     """for 2D Pareto chart"""
     plt.figure(figsize=(12, 8))
     
-
-    if 'Evaluation' not in df.columns:
-        df['Evaluation'] = df['Agent'].apply(
+    df_cleaned = df.copy()
+    
+    if 'Evaluation' not in df_cleaned.columns:
+        df_cleaned['Evaluation'] = df_cleaned['Agent'].apply(
             lambda x: x.split('(')[-1].replace(')', '') if '(' in x else 'Unknown'
         )
-
-        df['Agent'] = df['Agent'].apply(
+        df_cleaned['Agent'] = df_cleaned['Agent'].apply(
             lambda x: x.split(' (')[0] if ' (' in x else x
         )
     
-    if size_col:
-        scatter = sns.scatterplot(
-            x=x_col, y=y_col, 
-            hue="Agent",
-            style="Evaluation" if "Evaluation" in df.columns else None, 
-            sizes=(100, 400), data=df,
-            alpha=0.7
-        )
-    else:
-        scatter = sns.scatterplot(
-            x=x_col, y=y_col, 
-            hue="Agent",
-            style="Evaluation" if "Evaluation" in df.columns else None, 
-            s=200,
-            data=df, alpha=0.7
-        )
+    df_cleaned['AgentSimple'] = df_cleaned['Agent'].str.replace('Agent', '')
     
-    for i, row in df.iterrows():
+    colors = {
+        'MCTS': 'purple',
+        'EA': 'green',
+        'MARL': 'orange'
+    }
+    
+    markers = {
+        'Fixed Episodes': 'o',
+        'Fixed Resource': '^'
+    }
+
+    for agent_group in df_cleaned['AgentSimple'].unique():
+        for eval_type in df_cleaned['Evaluation'].unique():
+            subset = df_cleaned[(df_cleaned['AgentSimple'] == agent_group) & 
+                              (df_cleaned['Evaluation'] == eval_type)]
+            if not subset.empty:
+                color = colors.get(agent_group, 'blue')
+                marker = markers.get(eval_type, 'o')
+                
+                plt.scatter(
+                    subset[x_col], 
+                    subset[y_col],
+                    color=color,
+                    marker=marker,
+                    s=200,
+                    label=f"{agent_group} ({eval_type})",
+                    alpha=0.7
+                )
+    
+    for i, row in df_cleaned.iterrows():
         x = row[x_col]
         y = row[y_col]
         x_err = row.get(f"{x_col.split()[0]} StdDev", 0)
@@ -305,7 +297,7 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         
         plt.errorbar(x, y, xerr=x_err, yerr=y_err, fmt='none', ecolor='gray', alpha=0.5)
     
-    points = [(row[x_col], row[y_col]) for _, row in df.iterrows()]
+    points = [(row[x_col], row[y_col]) for _, row in df_cleaned.iterrows()]
     
     if not minimize_x:
         points = [(-x, y) for x, y in points]
@@ -322,59 +314,46 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
         pareto_x, pareto_y = zip(*pareto_points)
         plt.plot(pareto_x, pareto_y, 'k--', label='Pareto Frontier')
     
-    for i, row in df.iterrows():
+    annotation_offsets = {
+        "EA (Fixed Episodes)": (25, 15), 
+        "EA (Fixed Resource)": (-45, -25),
+        "MCTS (Fixed Episodes)": (-45, -35), 
+        "MCTS (Fixed Resource)": (-45, 15),
+        "MARL (Fixed Episodes)": (15, 15), 
+        "MARL (Fixed Resource)": (15, -15),
+    }
+    
+    for i, row in df_cleaned.iterrows():
         x = row[x_col]
         y = row[y_col]
         
-        # 明確な表記でラベルを表示
-        label = f"{row['Agent']} ({row['Evaluation']})"
-            
+        label = f"{row['AgentSimple']} ({row['Evaluation']})"
+        
+        x_offset, y_offset = 5, -15
+        
+        if label in annotation_offsets:
+            x_offset, y_offset = annotation_offsets[label]
+        
         plt.annotate(
             label,
             (x, y),
-            xytext=(5, -15),
+            xytext=(x_offset, y_offset),
             textcoords="offset points",
-            fontsize=12,
+            fontsize=ANNOTATION_SIZE,
             alpha=0.9
         )
-        
-        # サイズ情報の表示をオプションに基づいて制御
-        if size_col and show_size_values:
-            value_text = f"{size_col}: {row[size_col]:.1f}"
-            plt.annotate(
-                value_text,
-                (x, y),
-                xytext=(10, 8),
-                textcoords="offset points",
-                fontsize=12,
-                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7)
-            )
     
     max_x = plt.xlim()[1]
     min_x = plt.xlim()[0]
     max_y = plt.ylim()[1]
     min_y = plt.ylim()[0]
     
-    arrow_x_pos = min_x + (max_x - min_x) * 0.05
-    arrow_y_pos = min_y + (max_y - min_y) * 0.95
+    plt.legend(fontsize=LEGEND_SIZE, loc='best', framealpha=0.9)
     
-    handles, labels = scatter.get_legend_handles_labels()
-    agent_handles = []
-    agent_labels = []
-    
-    for h, l in zip(handles, labels):
-        if l in df["Agent"].values:
-            agent_handles.append(h)
-            agent_labels.append(l)
-    
-    if scatter.get_legend():
-        scatter.get_legend().remove()
-    
-    plt.legend(agent_handles, agent_labels, title="Agent", loc="best", framealpha=0.9)
-    
-    plt.title(title, fontsize=16)
-    plt.xlabel(x_label, fontsize=13)
-    plt.ylabel(y_label, fontsize=13)
+    plt.title(title, fontsize=TITLE_SIZE)
+    plt.xlabel(x_label, fontsize=LABEL_SIZE)
+    plt.ylabel(y_label, fontsize=LABEL_SIZE)
+    plt.tick_params(axis='both', labelsize=TICK_SIZE)
     plt.grid(True, linestyle='--', alpha=0.7)
     
     if len(pareto_points) >= 2:
@@ -383,10 +362,10 @@ def create_2d_pareto_chart(df, x_col, y_col, x_label, y_label, title, filename, 
             plt.fill_between(pareto_x, pareto_y, [max_y] * len(pareto_x), 
                             alpha=0.1, color='green', label='_ideal_region')
             
-            plt.annotate('Desireble', xy=(min_x + (max_x - min_x) * 0.2, max_y - (max_y - min_y) * 0.2),
+            plt.annotate('Desirable', xy=(min_x + (max_x - min_x) * 0.2, max_y - (max_y - min_y) * 0.2),
                         xytext=(min_x + (max_x - min_x) * 0.3, max_y - (max_y - min_y) * 0.3),
                         arrowprops=dict(arrowstyle='->', color='green', alpha=0.5),
-                        color='green', alpha=0.7, fontsize=12)
+                        color='green', alpha=0.7, fontsize=ANNOTATION_SIZE)
     
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, filename), dpi=300)
@@ -399,7 +378,7 @@ def create_2d_pareto_analysis(df, output_dir, show_size_values=False):
     create_2d_pareto_chart(
         df, 
         "Avg Time (ms)", "Win Rate (%)",
-        "Average Response Time (ms) - The smaller the better", "Win Rate (%) - The higher the better",
+        "Average Response Time (ms)", "Win Rate (%)",
         "Time vs Win Rate Trade-off Analysis",
         "pareto_time_winrate.png",
         output_dir,
@@ -410,7 +389,7 @@ def create_2d_pareto_analysis(df, output_dir, show_size_values=False):
     create_2d_pareto_chart(
         df, 
         "Memory (MB)", "Win Rate (%)",
-        "Memory Usage (MB) - The smaller the better", "Win Rate (%) - The higher the better",
+        "Memory Usage (MB)", "Win Rate (%)",
         "Memory vs Win Rate Trade-off Analysis",
         "pareto_memory_winrate.png",
         output_dir,
@@ -420,7 +399,7 @@ def create_2d_pareto_analysis(df, output_dir, show_size_values=False):
 
 def create_3d_visualization(df, output_dir):
     """for 3D visualization of performance metrics"""
-    fig = plt.figure(figsize=(12, 10))
+    fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection='3d')
     
     df_3d = df.copy()
@@ -432,52 +411,68 @@ def create_3d_visualization(df, output_dir):
             lambda x: x.split(' (')[0] if ' (' in x else x
         )
     
-    df_3d['Legend'] = df_3d.apply(
-        lambda row: f"{row['Agent']} ({row['Evaluation']})", axis=1
-    )
+    df_3d['Agent'] = df_3d['Agent'].str.replace('Agent', '')
     
-    markers = ['o', '^', 's', 'D', '*']
-    colormap = plt.cm.viridis
-    colors = [colormap(i) for i in np.linspace(0, 1, len(df_3d['Legend'].unique()))]
+    markers = {
+        'Fixed Episodes': 'o',
+        'Fixed Resource': '^'
+    }
     
-    for i, legend_name in enumerate(df_3d['Legend'].unique()):
-        agent_data = df_3d[df_3d['Legend'] == legend_name]
+    colors = {
+        'MCTS': 'purple',
+        'EA': 'green',
+        'MARL': 'orange'
+    }
+    
+    legend_handles = []
+    legend_labels = []
+    
+    for agent_name in sorted(df_3d['Agent'].unique()):
+        color = colors.get(agent_name, 'blue')
+        handle = ax.scatter([], [], [], color=color, s=150, label=agent_name)
+        legend_handles.append(handle)
+        legend_labels.append(agent_name)
+    
+    for eval_type, marker in markers.items():
+        handle = ax.scatter([], [], [], color='gray', marker=marker, s=150, label=eval_type)
+        legend_handles.append(handle)
+        legend_labels.append(eval_type)
+
+    for _, row in df_3d.iterrows():
+        agent = row['Agent']
+        eval_type = row['Evaluation']
+        x = row['Avg Time (ms)']
+        y = row['Memory (MB)']
+        z = row['Win Rate (%)']
+        
+        color = colors.get(agent, 'blue')
+        marker = markers.get(eval_type, 'o')
+        
         ax.scatter(
-            agent_data['Avg Time (ms)'].values,
-            agent_data['Memory (MB)'].values,
-            agent_data['Win Rate (%)'].values,
-            label=legend_name,
-            marker=markers[i % len(markers)],
-            color=colors[i % len(colors)],
+            x, y, z,
+            color=color,
+            marker=marker,
             s=150
         )
         
-        for j, row in agent_data.iterrows():
-            x = row['Avg Time (ms)']
-            y = row['Memory (MB)']
-            z = row['Win Rate (%)']
-            dx = row.get('Time StdDev', 0)
-            dy = row.get('Memory StdDev', 0)
-            dz = row.get('Win Rate StdDev', 0)
-            
-            # X-axis error bar
-            ax.plot([x-dx, x+dx], [y, y], [z, z], color='gray', alpha=0.3)
-            
-            # Y-axis error bar
-            ax.plot([x, x], [y-dy, y+dy], [z, z], color='gray', alpha=0.3)
-            
-            # Z-axis error bar
-            ax.plot([x, x], [y, y], [z-dz, z+dz], color='gray', alpha=0.3)
-    
-    ax.set_xlabel('Average Response Time (ms)', fontsize=12)
-    ax.set_ylabel('Memory Usage (MB)', fontsize=12)
-    ax.set_zlabel('Win Rate (%)', fontsize=12)
+        dx = row.get('Time StdDev', 0)
+        dy = row.get('Memory StdDev', 0)
+        dz = row.get('Win Rate StdDev', 0)
+        
+        # error bars
+        ax.plot([x-dx, x+dx], [y, y], [z, z], color='gray', alpha=0.3)
+        ax.plot([x, x], [y-dy, y+dy], [z, z], color='gray', alpha=0.3)
+        ax.plot([x, x], [y, y], [z-dz, z+dz], color='gray', alpha=0.3)
+
+    ax.set_xlabel('Average Response Time (ms)', fontsize=LABEL_SIZE - 6)
+    ax.set_ylabel('Memory Usage (MB)', fontsize=LABEL_SIZE - 6)
+    ax.set_zlabel('Win Rate (%)', fontsize=LABEL_SIZE - 6)
     
     max_x = max(df['Avg Time (ms)'].max(), 1)
     max_y = max(df['Memory (MB)'].max(), 1)
     max_z = max(df['Win Rate (%)'].max(), 1)
     
-    ax.quiver(max_x * 0.9, 0, 0, -max_x * 0.2, 0, 0, color='r', arrow_length_ratio=0.1, label='Minimize')
+    ax.quiver(max_x * 0.9, 0, 0, -max_x * 0.2, 0, 0, color='r', arrow_length_ratio=0.1)
     ax.text(max_x * 0.8, 0, -max_z * 0.1, "Time ↓", color='r')
     
     ax.quiver(0, max_y * 0.9, 0, 0, -max_y * 0.2, 0, color='r', arrow_length_ratio=0.1)
@@ -486,16 +481,23 @@ def create_3d_visualization(df, output_dir):
     ax.quiver(0, 0, max_z * 0.7, 0, 0, max_z * 0.2, color='g', arrow_length_ratio=0.1)
     ax.text(0, -max_y * 0.1, max_z * 0.8, "Win Rate ↑", color='g')
     
-    ax.view_init(elev=30, azim=45)
-    plt.title("3D Performance Analysis with Error Bars", fontsize=16)
-    plt.legend(title="Agent", fontsize=10, title_fontsize=12)
+    ax.view_init(elev=25, azim=40)
+    ax.set_xlim(0, max_x * 1.2)
+    ax.set_ylim(0, max_y * 1.2)
+    ax.set_zlim(0, max_z * 1.2)
+    
+    plt.title("3D Performance Analysis with Error Bars", fontsize=TITLE_SIZE)
+    
+    ax.legend(legend_handles, legend_labels, fontsize=SMALL_ANNOTATION_SIZE - 2, framealpha=0.9, loc='upper right', bbox_to_anchor=(1.4, 1.02),)
+    
     plt.tight_layout()
+    plt.tick_params(axis='both', labelsize=TICK_SIZE - 4)
+    plt.subplots_adjust(left=0.030, right=0.985, top=0.923, bottom=0.120)
     plt.savefig(os.path.join(output_dir, "3d_performance_analysis.png"), dpi=300)
     plt.close()
 
 def create_radar_chart(df, output_dir):
     """visualize performance metrics using radar chart with improved readability"""
-    # エージェント名から"Agent"を削除
     df_radar = df.copy()
     if 'Evaluation' not in df_radar.columns:
         df_radar['Evaluation'] = df_radar['Agent'].apply(
@@ -505,22 +507,19 @@ def create_radar_chart(df, output_dir):
             lambda x: x.split(' (')[0].replace('Agent', '') if ' (' in x else x.replace('Agent', '')
         )
     
-    # レジェンドラベルに評価タイプを含める
     df_radar['Legend'] = df_radar.apply(
         lambda row: f"{row['Agent']} ({row['Evaluation']})", axis=1
     )
     
     categories = ['Win Rate', 'Time Efficiency', 'Memory Efficiency']
     
-    # 図のサイズを拡大して余白を確保
-    fig = plt.figure(figsize=(14, 10))
+    fig = plt.figure(figsize=(14, 6))
     ax = fig.add_subplot(111, polar=True)
     
     N = len(categories)
     angles = [n / float(N) * 2 * np.pi for n in range(N)]
     angles += angles[:1]
     
-    # 線のスタイルを改良
     linestyles = {
         'Fixed Episodes': '-',
         'Fixed Resource': '--'
@@ -538,24 +537,16 @@ def create_radar_chart(df, output_dir):
         agent_name = agent_data['Agent'].iloc[0]
         eval_type = agent_data['Evaluation'].iloc[0]
         
-        # カテゴリに対応する値の正規化を行う
-        win_rate = agent_data['Win Rate (%)'].iloc[0] / 100.0  # Win Rateを0-1に正規化
-        
-        # Time Efficiencyの計算 (小さい方が良いので逆数を取って正規化)
+        win_rate = agent_data['Win Rate (%)'].iloc[0] / 100.0
+
         avg_time = agent_data['Avg Time (ms)'].iloc[0]
-        time_efficiency = 1.0 / (1.0 + avg_time / 100.0)  # 時間が短いほど値が大きい
+        time_efficiency = 1.0 / (1.0 + avg_time / 100.0)
         
-        # Memory Efficiencyの計算 (小さい方が良いので逆数を取って正規化)
         memory = agent_data['Memory (MB)'].iloc[0]
-        memory_efficiency = 1.0 / (1.0 + memory / 100.0)  # メモリ使用量が少ないほど値が大きい
-        
-        # レーダーチャート用の値の配列を作成
+        memory_efficiency = 1.0 / (1.0 + memory / 100.0)
+
         values = [win_rate, time_efficiency, memory_efficiency]
-        
-        # 値を0-1の範囲に制限
         values = [max(0.0, min(1.0, v)) for v in values]
-        
-        # 閉じた図形にするために最初の値を追加
         values += values[:1]
 
         linestyle = linestyles.get(eval_type, '-')
@@ -568,26 +559,24 @@ def create_radar_chart(df, output_dir):
     handles, labels = plt.gca().get_legend_handles_labels()
     clean_labels = [label.replace('Agent', '') for label in labels]
 
-    plt.xticks(angles[:-1], categories, fontsize=16)
+    plt.xticks(angles[:-1], categories, fontsize=TICK_SIZE + 2)
     ax.set_rlabel_position(0)
-    plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=14)
+    plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=16)
     plt.ylim(0, 1)
 
-    plt.figtext(0.78, 0.47, "Higher is better", ha='center', va='center', fontsize=14, 
-            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+    # plt.figtext(0.72, 0.47, "Higher is better", ha='center', va='center', fontsize=14)
     
-    plt.figtext(0.36, 0.87, "Higher is better", ha='center', va='center', fontsize=14,
-            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+    # plt.figtext(0.45, 0.95, "Higher is better", ha='center', va='center', fontsize=14)
     
-    plt.figtext(0.36, 0.13, "Higher is better", ha='center', va='center', fontsize=14,
-            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+    # plt.figtext(0.45, 0.10, "Higher is better", ha='center', va='center', fontsize=14)
     
 
     plt.legend(handles, clean_labels, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=3, 
-              fontsize=14, framealpha=0.9)
+              fontsize=LEGEND_SIZE, framealpha=0.9)
     
-    plt.title("Multi-dimensional Agent Comparison", size=20, pad=30)
+    plt.title("Multi-dimensional Agent Comparison", fontsize=TITLE_SIZE, pad=30)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.subplots_adjust(left=0.090, right=0.985, top=0.923, bottom=0.120)
     plt.savefig(os.path.join(output_dir, "radar_comparison.png"), dpi=300, bbox_inches='tight')
     plt.close()
 

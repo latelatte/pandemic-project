@@ -25,12 +25,10 @@ class City:
         self.infection_level += amount
         print(f"{self.name}: infection level {old_level} -> {self.infection_level}")
         
-        # アウトブレイクチェックを行う前に属性の存在を確認
         if hasattr(self, 'simulation') and self.simulation:
-            max_level = getattr(self.simulation, 'max_infection_level', 3)  # デフォルト値として3を使用
+            max_level = getattr(self.simulation, 'max_infection_level', 3)  # default 3
             
             if self.infection_level > max_level:
-                # アウトブレイク処理
                 if not hasattr(self, 'outbreak_marker') or not self.outbreak_marker:
                     self.outbreak_marker = True
                     if hasattr(self.simulation, 'handle_outbreak'):

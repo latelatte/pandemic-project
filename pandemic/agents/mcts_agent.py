@@ -1118,51 +1118,7 @@ class ImprovedMCTSAgent:
             self.action_stats[state_key][action_type] = (
                 self.value_sum[state_key][action_type] / self.visit_counts[state_key][action_type]
             )
-        
-        # # Log decision
-        # if action_type == "move":
-        #     target_city = best_action.get("target_city")
-        #     if target_city:
-        #         debug_log(f"ACTION: Moving to {target_city.name}")
-        # elif action_type == "treat":
-        #     debug_log(f"ACTION: Treating infection in {player.city.name}")
-        # elif action_type == "build":
-        #     debug_log(f"ACTION: Building research station in {player.city.name}")
-        # elif action_type == "discover_cure":
-        #     color = best_action.get("color")
-        #     debug_log(f"ACTION: Discovering cure for {color}")
-        # elif action_type == "share_knowledge":
-        #     card = best_action.get("card")
-        #     recipient = best_action.get("recipient") 
-        #     if card and recipient:
-        #         debug_log(f"ACTION: Sharing {card.city_name} card with {recipient.name}")
-        # else:
-        #     debug_log(f"ACTION: {action_type}")
-        # print("===== MCTS ACTION DEBUG =====")
-        # print(f"Player: {player.name} at {player.city.name if player.city else 'None'}")
-        # if best_action.get("type") == "move":
-        #     target_city = best_action.get("target_city")
-        #     if target_city and player.city and target_city.name == player.city.name:
-        #         print(f"DEBUG: Selected move to: {target_city.name}")
-        #         print(f"DEBUG: Current city: {player.city.name}")
-        #         print(f"DEBUG: Same city check: {target_city.name == player.city.name}")
-                
-        #         if target_city.name == player.city.name:
-        #             print(f"Warning: MCTS tried moving to same city {player.city.name}, finding alternative action")
-                    
-        #             # インデントを修正し、代替アクションを実行
-        #             if player.city.infection_level > 0:
-        #                 best_action = {"type": "treat", "city": player.city}
-        #                 print(f"Choosing to treat infection in {player.city.name} instead")
-        #             elif player.city.neighbours:
-        #                 target = random.choice(player.city.neighbours)
-        #                 best_action = {"type": "move", "target_city": target}
-        #                 print(f"Choosing to move to {target.name} instead")
-        #             else:
-        #                 print("Choosing to pass the turn")
-        #                 best_action = {"type": "pass"}
-        # print(f"MCTS final action: {best_action.get('type')} to {best_action.get('target_city').name if best_action.get('type') == 'move' and best_action.get('target_city') else ''}")
-        
+          
         if best_action.get("type") == "move":
             target_city = best_action.get("target_city")
             if target_city:

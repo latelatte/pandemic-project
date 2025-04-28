@@ -115,7 +115,6 @@ def main():
         os.path.dirname(os.path.abspath(__file__)),
         "pandemic", "config"
     )
-    # print(f"config directory: {config_dir}")
     
     if args.seed is not None:
         import random

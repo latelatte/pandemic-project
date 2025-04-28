@@ -29,7 +29,6 @@ class PandemicSimulation:
         self.infection_rates = [2, 2, 2, 3, 3, 4, 4] 
         self.infection_rate_index = 0
         
-        # 疾病の初期化
         self.diseases = []
         disease_colors = ["Blue", "Red", "Yellow", "Black"]
         for color in disease_colors[:3]:
@@ -44,7 +43,7 @@ class PandemicSimulation:
         
         self.infection_rate_index = difficulty_settings.get("initial_infection_rate_index", 0)
 
-        self.actions_per_turn = game_config.get("actions_per_turn", 4)  # デフォルト値として4を設定
+        self.actions_per_turn = game_config.get("actions_per_turn", 4)
 
         self.cities = self._create_cities(cities_config)
         for city in self.cities:
@@ -128,7 +127,6 @@ class PandemicSimulation:
         try:
             with open(filepath, 'r') as f:
                 config = json.load(f)
-                # print(f"Loaded config from {filepath}")
                 return config
         except FileNotFoundError:
             print(f"Warning: Config file {filepath} not found. Using defaults.")
@@ -158,7 +156,6 @@ class PandemicSimulation:
     def _create_player_deck(self):
         all_colors = ["Blue", "Red", "Yellow"]
         
-        #* プレイヤーデッキのサイズを都市数に基づいて調整
         if len(self.cities) < 20:
             multiplier = 6
         else:
@@ -169,14 +166,11 @@ class PandemicSimulation:
             for _ in range(multiplier):
                 citycards.append(Card("CITY", city_name=city.name, color=random.choice(all_colors)))
 
-        #* エピデミックカード数を調整
         epidemic_count = 3
         epidemic_cards = [Card("EPIDEMIC")] * epidemic_count
         
         deck = citycards + epidemic_cards
         random.shuffle(deck)
-        # print(f"Created player deck with {len(deck)} cards ({len(citycards)} city cards, {epidemic_count} epidemics)")
-        # print(f"Total cities: {len(self.cities)}")  # 都市数を出力してデバッグ
         return deck
 
     def _create_infection_deck(self):
