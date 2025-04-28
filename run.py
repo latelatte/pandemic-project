@@ -202,7 +202,7 @@ class ConvergenceSimulationRunner(SimulationRunner):
             writer.add_scalar(f"{agent_name}/avg_turns", current_perf.get("avg_turns", 0), ep)
             writer.add_scalar(f"{agent_name}/avg_outbreaks", current_perf.get("avg_outbreaks", 0), ep)
             
-            if ep % 10 == 0 or ep < 100:  # 初期は密に、その後は間引いて記録
+            if ep % 10 == 0 or ep < 100: 
                 learning_curve["episodes"].append(ep)
                 learning_curve["win_rates"].append(current_win_rate)
                 learning_curve["avg_times_ms"].append(current_perf.get("avg_time_ms", 0))
@@ -213,7 +213,6 @@ class ConvergenceSimulationRunner(SimulationRunner):
                 writer.add_text("convergence", f"Detected at episode {ep+1}", ep)
                 break
             
-            # 定期的に進捗評価
             if ep % 100 == 0 and ep > 0:
                 self.evaluate_agent_progress(ep)
                 print(f"Episode {ep}: Win Rate = {current_win_rate:.4f}")
@@ -288,7 +287,6 @@ class IntegratedEvaluationFramework:
         self.fixed_episodes_results = {}
         self.fixed_resource_results = {}
         
-        #* ここでデフォルトのエピソード数とリソース時間を設定
         self.default_episodes = 1500
         self.default_resource_time = 5 * 60 * 60
         self.eval_episodes = 500
@@ -967,7 +965,6 @@ class IntegratedEvaluationFramework:
         
         print(f"\nIntegrated evaluation report saved to: {output_file}")
         
-        #* create visualizations
         visualization_dir = os.path.join(self.log_dir, f"visualizations_{timestamp}")
         run_analysis(self.log_dir, visualization_dir)
         run_pareto_analysis(self.log_dir, visualization_dir)

@@ -80,7 +80,6 @@ def check_config_files():
         "pandemic", "config"
     )
     
-    # print(f"Checking config files in: {config_dir}")
     
     config_files = [
         "cities_config.json",
@@ -93,11 +92,9 @@ def check_config_files():
     for filename in config_files:
         filepath = os.path.join(config_dir, filename)
         if os.path.exists(filepath):
-            # print(f"✓ {filename} exists")
             try:
                 with open(filepath, 'r') as f:
                     data = json.load(f)
-                # print(f"  JSON is valid, keys: {list(data.keys())}")
             except json.JSONDecodeError:
                 print(f"✗ {filename} contains invalid JSON")
                 all_exist = False
