@@ -7,21 +7,15 @@ import os
 import json
 import glob
 
-TITLE_SIZE = 22 + 2
-LABEL_SIZE = 20 + 2
-TICK_SIZE = 18 + 2
-LEGEND_SIZE = 18 + 2
-ANNOTATION_SIZE = 18 + 2
-SMALL_ANNOTATION_SIZE = 16 + 2
-FIG_TEXT_SIZE = 13 + 2
+TITLE_SIZE = 24
+LABEL_SIZE = 22
+TICK_SIZE = 20
+LEGEND_SIZE = 20
+ANNOTATION_SIZE = 20
+SMALL_ANNOTATION_SIZE = 18
+FIG_TEXT_SIZE = 15
 
 def find_project_root():
-    """
-    プロジェクトルートディレクトリを自動検出する
-    
-    Returns:
-        str: プロジェクトルートのパス
-    """
     current_path = os.path.abspath(__file__)
     
     current_dir = os.path.dirname(current_path)
@@ -564,13 +558,6 @@ def create_radar_chart(df, output_dir):
     plt.yticks([0.2, 0.4, 0.6, 0.8], ["0.2", "0.4", "0.6", "0.8"], color="grey", size=16)
     plt.ylim(0, 1)
 
-    # plt.figtext(0.72, 0.47, "Higher is better", ha='center', va='center', fontsize=14)
-    
-    # plt.figtext(0.45, 0.95, "Higher is better", ha='center', va='center', fontsize=14)
-    
-    # plt.figtext(0.45, 0.10, "Higher is better", ha='center', va='center', fontsize=14)
-    
-
     plt.legend(handles, clean_labels, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=3, 
               fontsize=LEGEND_SIZE, framealpha=0.9)
     
@@ -763,7 +750,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_latest', type=int, default=6, help='number of latest experiments to analyze')
     parser.add_argument('--output', type=str, default=None, help='output directory for plots')
     parser.add_argument('--show-size-values', action='store_true', help='show additional metric values on plots')
-    parser.add_argument('--multiple', action='store_true', help='use multiple experiments data integration')
+    parser.add_argument('--multiple', action='store_true', default=True, help='use multiple experiments data integration')
     
     args = parser.parse_args()
     

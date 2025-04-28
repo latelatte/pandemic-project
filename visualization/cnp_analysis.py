@@ -101,7 +101,6 @@ def load_dual_evaluation_data(eval_dir, report_file=None):
             avg_time = metrics.get("agent_performance", {}).get(agent, {}).get("avg_time_ms", 0)
             memory_mb = metrics.get("resource_usage", {}).get(agent, {}).get("avg_memory_mb", 0)
             
-            # Fix: Use "total_episodes" instead of "episodes_completed" to get the episode count
             episodes = metrics.get("total_episodes", 0)
             
             processed_data["fixed_resource"][agent] = {
@@ -122,28 +121,15 @@ def load_dual_evaluation_data(eval_dir, report_file=None):
 
 
 def find_project_root():
-    """
-    プロジェクトルートディレクトリを自動検出する
-    
-    Returns:
-        str: プロジェクトルートのパス
-    """
-    # 現在のスクリプトの絶対パス
     current_path = os.path.abspath(__file__)
     
-    # 現在のスクリプトのディレクトリ
     current_dir = os.path.dirname(current_path)
     
-    # 親ディレクトリ (おそらくプロジェクトルート)
     parent_dir = os.path.dirname(current_dir)
     
-    # プロジェクトルートの検証 (evaluationsディレクトリが存在するか確認)
     if os.path.exists(os.path.join(parent_dir, "evaluations")):
-        print(f"Found project root: {parent_dir}")
         return parent_dir
     
-    # evaluationsが見つからない場合は、現在のディレクトリを返す (フォールバック)
-    print(f"Project root not detected. Using current directory: {current_dir}")
     return current_dir
 
 
@@ -160,24 +146,19 @@ def load_multiple_experiment_data(eval_dir, experiment_dirs=None):
     """
     all_experiments_data = []
     
-    # 相対パスが指定された場合はプロジェクトルートを考慮
     if eval_dir.startswith('./') or eval_dir.startswith('../'):
         project_root = find_project_root()
-        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
         if eval_dir == './evaluations':
             eval_dir = os.path.join(project_root, 'evaluations')
             print(f"Using project root evaluations directory: {eval_dir}")
     
-    # ディレクトリパスを絶対パスに変換して存在確認
     eval_dir = os.path.abspath(eval_dir)
     print(f"Using base directory: {eval_dir}")
     
     if not os.path.exists(eval_dir):
         print(f"Error: Directory '{eval_dir}' does not exist.")
-        # カレントディレクトリの確認
         current_dir = os.getcwd()
         print(f"Current working directory: {current_dir}")
-        # サブディレクトリの一覧表示
         if os.path.exists(os.path.dirname(eval_dir)):
             parent_dir = os.path.dirname(eval_dir)
             print(f"Contents of parent directory ({parent_dir}):")
@@ -185,45 +166,35 @@ def load_multiple_experiment_data(eval_dir, experiment_dirs=None):
                 print(f"  - {item}")
         return []
     
-    # リポジトリ内のすべての評価レポートを読み込む
     all_report_files = []
     
-    # ディレクトリ構造を探索
     if experiment_dirs:
-        # 特定のディレクトリが指定された場合
         for exp_dir_name in experiment_dirs:
             exp_dir = os.path.join(eval_dir, exp_dir_name)
             if os.path.exists(exp_dir) and os.path.isdir(exp_dir):
                 report_files = glob.glob(os.path.join(exp_dir, "*evaluation_report_*.json"))
-                # 統合済みファイルを除外しない（すべてのレポートを処理）
                 all_report_files.extend(report_files)
     else:
-        # 自動探索モード - 直接ディレクトリ内のレポートを探す
         report_files = glob.glob(os.path.join(eval_dir, "*evaluation_report_*.json"))
         if report_files:
-            # レポートをタイムスタンプでソート
             report_files = sorted(report_files, key=os.path.getctime)
             all_report_files.extend(report_files)
             print(f"Found {len(report_files)} evaluation reports directly in {eval_dir}")
         
-        # サブディレクトリも探索
         for root, dirs, files in os.walk(eval_dir):
-            # 現在のディレクトリがeval_dirそのものでない場合のみ処理
             if root != eval_dir:
                 for file in files:
                     if file.endswith(".json") and "evaluation_report" in file:
                         all_report_files.append(os.path.join(root, file))
     
-    # 重複を削除
     all_report_files = list(set(all_report_files))
     
     print(f"Found {len(all_report_files)} evaluation reports:")
-    for report_file in all_report_files[:5]:  # 最初の5つだけ表示
+    for report_file in all_report_files[:5]:
         print(f"  - {os.path.basename(report_file)}")
     if len(all_report_files) > 5:
         print(f"  ... and {len(all_report_files) - 5} more")
     
-    # ここが重要なポイント: 各レポートを個別に処理
     for report_file in all_report_files:
         try:
             print(f"Processing report: {report_file}")
@@ -233,7 +204,6 @@ def load_multiple_experiment_data(eval_dir, experiment_dirs=None):
                 all_experiments_data.append(exp_data)
                 print(f"Added data from report: {os.path.basename(report_file)}")
                 
-                # エージェント情報を出力して確認
                 for agent_type in ["fixed_episodes", "fixed_resource"]:
                     if agent_type in exp_data:
                         print(f"  {agent_type.upper()} agents:")
@@ -303,7 +273,6 @@ def integrate_experiment_data(all_experiments_data):
                 if "cnp_metrics" in exp_data and agent in exp_data["cnp_metrics"]:
                     cnp_values.append(exp_data["cnp_metrics"][agent].get("fixed_episodes_cnp", 0))
         
-        # 各エクスペリメントのデータをデバッグ表示
         print(f"Agent {agent} data from all experiments:")
         for i, exp_data in enumerate(all_experiments_data):
             if agent in exp_data.get("fixed_episodes", {}):
@@ -381,8 +350,7 @@ def integrate_experiment_data(all_experiments_data):
                         "std": std_cnp
                     }
                 }
-            
-            # デバッグ出力を追加
+            # Confirmation of statistical data
             print(f"Agent {agent} integrated statistics:")
             print(f"  Fixed Episodes: {len(win_rates)} values, mean={mean_win_rate:.2f}%, " +
                   f"CI=[{ci_win_rate[0]:.2f}, {ci_win_rate[1]:.2f}]")
@@ -407,15 +375,13 @@ def integrate_experiment_data(all_experiments_data):
                 # Get CNP values if available
                 if "cnp_metrics" in exp_data and agent in exp_data["cnp_metrics"]:
                     cnp_values.append(exp_data["cnp_metrics"][agent].get("fixed_resource_cnp", 0))
-        
-        # 各エクスペリメントのデータをデバッグ表示
+
         for i, exp_data in enumerate(all_experiments_data):
             if agent in exp_data.get("fixed_resource", {}):
                 agent_data = exp_data["fixed_resource"][agent]
                 win_rate = agent_data.get("win_rate", 0)
                 print(f"  Experiment {i+1}: Fixed Resource Win Rate = {win_rate:.2f}%")
         
-        # Calculate statistics if we have data
         if win_rates:
             # Mean values
             mean_win_rate = np.mean(win_rates)
@@ -505,24 +471,12 @@ def integrate_experiment_data(all_experiments_data):
 
 
 def format_cnp_value(value):
-    """
-    CNP値を適切な形式でフォーマットする
-    
-    Args:
-        value: フォーマットするCNP値
-        
-    Returns:
-        str: フォーマットされた文字列
-    """
-    # 値が0に近い場合は0表示
     if abs(value) < 1e-10:
         return "0"
     
-    # 値の絶対値が大きいまたは小さい場合は指数表記
     if abs(value) >= 1e4 or abs(value) < 0.01:
         return f"{value:.2e}"
     
-    # それ以外は小数点表記
     return f"{value:.2f}"
 
 
@@ -889,8 +843,6 @@ def create_cnp_visualization(data, output_dir):
     df["Time Efficiency"] = df["Win Rate (%)"] / df["Avg Time (ms)"]
 
     ax_time.set_yscale('log')
-
-    n_agents = len(unique_agents)
     
     time_offsets = {}
     
@@ -1135,7 +1087,7 @@ def create_cnp_visualization(data, output_dir):
             effect_text = "Large"
             
         plt.text(x[i], 5, f"d={effect_size:.2f}\n({effect_text})", 
-                ha='center', va='center', fontsize=12, #*効果量フォントサイズ
+                ha='center', va='center', fontsize=12,
                 bbox=dict(boxstyle="round,pad=0.3", fc='lightyellow', alpha=0.7))
     
     plt.xlabel("Agent", fontsize=LABEL_SIZE)
@@ -1167,10 +1119,8 @@ def run_analysis(eval_dir, output_dir=None, use_multiple_experiments=False, expe
     Returns:
         bool: Success flag
     """
-    # 相対パスが指定された場合はプロジェクトルートを考慮
     if eval_dir.startswith('./') or eval_dir.startswith('../'):
         project_root = find_project_root()
-        # ./evaluations が指定された場合、プロジェクトルートの evaluations を使用
         if eval_dir == './evaluations':
             eval_dir = os.path.join(project_root, 'evaluations')
             print(f"Using project root evaluations directory: {eval_dir}")
@@ -1185,7 +1135,6 @@ def run_analysis(eval_dir, output_dir=None, use_multiple_experiments=False, expe
         
         if not all_experiments_data:
             print("Failed to load multiple experiment data.")
-            # 読み込みに失敗した場合は単一実験モードにフォールバック
             print("Falling back to single experiment mode...")
             use_multiple_experiments = False
             data = load_dual_evaluation_data(eval_dir)
@@ -1194,7 +1143,6 @@ def run_analysis(eval_dir, output_dir=None, use_multiple_experiments=False, expe
                 return False
         else:
             print(f"Successfully loaded {len(all_experiments_data)} experiments. Integrating data...")
-            # データ統合前の詳細情報を表示
             for i, exp_data in enumerate(all_experiments_data):
                 print(f"Experiment {i+1} agents:")
                 for agent_type in ["fixed_episodes", "fixed_resource"]:
@@ -1233,7 +1181,6 @@ if __name__ == "__main__":
     import sys
     import argparse
     
-    # プロジェクトルートの検出
     project_root = find_project_root()
     default_eval_dir = os.path.join(project_root, 'evaluations')
     
@@ -1242,7 +1189,7 @@ if __name__ == "__main__":
                         help='Directory containing evaluation data')
     parser.add_argument('--output_dir', type=str, default=None,
                         help='Directory to save visualizations')
-    parser.add_argument('--multiple', action='store_true',
+    parser.add_argument('--multiple', action='store_true', default=True,
                         help='Use multiple experiments data integration')
     parser.add_argument('--experiments', nargs='+', default=None,
                         help='Specific experiment directories to use')
