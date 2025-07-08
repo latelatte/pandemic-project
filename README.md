@@ -7,3 +7,6 @@ Statistical analysis with 95% confidence intervals confirms the significance of 
 These findings challenge the assumption that more computationally intensive approaches necessarily deliver proportionally better results in cooperative decision-making domains. The research demonstrates that meaningful Al performance can be achieved with modest computational resources when appropriate algorithmic approaches are selected. This has important implications for democratizing Al research capabilities and promoting environmentally sustainable development practices.
 The methodological framework developed in this study offers a template for future resource-conscious Al evaluations that extend beyond raw performance to consider efficiency, accessibility, and sustainability dimensions.
 While implementation quality and domain-specific characteristics limit gen-eralizability, the substantial efficiency advantages observed for EA and MCTS highlight the value of algorithmic selection guided by available computational resources.
+
+---
+Ping me for the full dessertaion.
